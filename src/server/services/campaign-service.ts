@@ -99,7 +99,7 @@ export const CampaignService = {
     let providerId = campaign.provider_campaign_id;
     if (!providerId) {
       providerId = await SarvamCalling.createCampaign(admin, {
-        name: `CRM · ${campaign.name}`,
+        name: `CRM ${campaign.name}`,
         description: campaign.description ?? 'Bulk campaign from FlashQC Digi CRM',
         agent: r.agent,
         line: r.line,

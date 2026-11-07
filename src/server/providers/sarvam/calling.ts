@@ -34,6 +34,20 @@ export interface CohortUser {
 
 const hhmm = (t: string) => t.slice(0, 5);
 
+/** Sarvam names must match ^[\w\- ]{1,50}$ (letters, digits, underscore, hyphen, space). */
+export function sarvamName(raw: string, fallback = 'FlashQC CRM'): string {
+  const cleaned = raw
+    .normalize('NFKD')
+    .replace(/[\u2013\u2014\u00b7|/:.,]+/g, ' - ')
+    .replace(/[^\w\- ]+/g, '')
+    .replace(/\s+/g, ' ')
+    .replace(/(\s*-\s*)+/g, ' - ')
+    .replace(/^[\s-]+|[\s-]+$/g, '')
+    .slice(0, 50)
+    .trim();
+  return cleaned || fallback;
+}
+
 async function client(admin: DB) {
   const c = await SarvamMcpClient.connect(admin);
   if (!c) throw new AppError('Sarvam is not connected. Connect it on the Integrations page.', 'sarvam_not_connected');
@@ -112,7 +126,7 @@ export const SarvamCalling = {
     const start = new Date(Date.now() + 60_000);
     const end = new Date(start.getTime() + (input.days ?? 30) * 86400_000);
     const res = await c.callTool<{ id?: string | null; campaign_id?: string }>('configure_campaign', {
-      name: input.name.slice(0, 120),
+      name: sarvamName(input.name),
       description: (input.description ?? 'Created by FlashQC Digi CRM').slice(0, 150),
       start_timestamp: start.toISOString(),
       end_timestamp: end.toISOString(),
@@ -139,7 +153,7 @@ export const SarvamCalling = {
       const res = await c.callTool<{ id?: string; cohort_id?: string }>('stream_cohort_users', {
         parent: 'campaign',
         parent_id: campaignId,
-        name: `${name}${users.length > 1000 ? ` #${i / 1000 + 1}` : ''}`.slice(0, 120),
+        name: sarvamName(`${name}${users.length > 1000 ? ` part ${i / 1000 + 1}` : ''}`, 'FlashQC CRM contacts'),
         users: users.slice(i, i + 1000),
       });
       const id = res.id ?? res.cohort_id;
@@ -182,7 +196,7 @@ export const SarvamCalling = {
       await this.control(admin, s.sarvam_direct_campaign_id, 'cancel').catch((e) => console.error('[sarvam] cancel old direct campaign', e));
     }
     const id = await this.createCampaign(admin, {
-      name: 'FlashQC CRM – Live calls',
+      name: 'FlashQC CRM Live calls',
       description: 'One-off live calls placed from the FlashQC Digi CRM',
       agent: r.agent,
       line: r.line,
