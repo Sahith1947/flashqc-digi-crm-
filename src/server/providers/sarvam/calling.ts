@@ -123,7 +123,8 @@ export const SarvamCalling = {
     input: { name: string; description?: string; agent: LiveAgent; line: LiveLine; baseUrl: string; maxAttempts: number; windowStart: string; windowEnd: string; days?: number; metadata?: Record<string, string> },
   ): Promise<string> {
     const c = await client(admin);
-    const start = new Date(Date.now() + 60_000);
+    // Sarvam requires the start to be at least 120 s in the future.
+    const start = new Date(Date.now() + 180_000);
     // Sarvam caps a campaign's duration at 90 days.
     const end = new Date(start.getTime() + Math.min(input.days ?? 30, 85) * 86400_000);
     const res = await c.callTool<{ id?: string | null; campaign_id?: string }>('configure_campaign', {
