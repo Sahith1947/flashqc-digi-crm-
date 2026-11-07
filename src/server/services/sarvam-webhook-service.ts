@@ -298,7 +298,24 @@ export const SarvamWebhookService = {
     if (ref?.[1] === 'call' && !callId) {
       // A one-off "Live call" placed from the CRM: the queued call row is waiting for this result.
       const { data: queued } = await admin.from('calls').select('id, provider_call_id').eq('id', ref[2]).maybeSingle();
-      if (queued && !queued.provider_call_id) callId = queued.id;
+      if (queued) {
+        // The call may have been moved to a newer Sarvam campaign (e.g. after a calling-hours change).
+        // An attempt from the replaced campaign (typically "Campaign Cancelled") must not decide the result.
+        const { data: sub } = await admin
+          .from('call_events')
+          .select('payload')
+          .eq('call_id', queued.id)
+          .in('event_type', ['submitted_to_sarvam', 'resubmitted_to_sarvam'])
+          .order('occurred_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const current = (sub?.payload as { sarvam_campaign_id?: string } | null)?.sarvam_campaign_id;
+        if (current && current !== p.campaign_id) {
+          await recordEvent(admin, queued.id, 'superseded_attempt', null, iso(p.executed_at) ?? endedAt, p as unknown as Record<string, unknown>);
+          return { callId: queued.id, status: 'superseded' as const };
+        }
+        if (!queued.provider_call_id) callId = queued.id;
+      }
     }
     if (ref?.[1] === 'cc') {
       const { data: cc } = await admin.from('campaign_contacts').select('id, campaign_id, contact_id').eq('id', ref[2]).maybeSingle();

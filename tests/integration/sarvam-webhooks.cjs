@@ -68,6 +68,13 @@ const vars = { call_summary: 'Owner of Hotel Paradise agreed to a meeting tomorr
   [s] = await post({ deployment_id: 'FlashQC-Dig-1eb66f90-b322', app_id: 'Conversatio-ef4d6b32-0d9b', interaction_id: 'int-lak-2', user_phone_number: '+919848054321', agent_phone_number: '+917965482329', duration: 30, start_datetime: '2026-11-08T10:00:00Z', end_datetime: '2026-11-08T10:00:30Z', interaction_transcript: [{ role: 'user', en_text: 'Please stop calling me' }], final_agent_variables: { call_summary: 'Asked not to be called.', consultation_outcome: 'not_interested', lead_temperature: 'COLD' } });
   ok(sql(`select lead_stage||'|'||last_emotion from contacts where full_name='Lakshmi'`) === 'meeting_booked|Annoyed', 'stage protected; annoyed emotion detected');
   ok(sql(`select count(*) from contacts`) === '3', 'no duplicate contacts created');
+  // Call moved to a new campaign (calling hours changed): the cancelled attempt from the old campaign is ignored
+  const moved = sql(`insert into calls (direction, status, phone_e164, is_simulated) values ('outbound','queued','+919848012345',false) returning id`).split('\n')[0];
+  sql(`insert into call_events (call_id, event_type, status, source, payload, occurred_at) values ('${moved}','submitted_to_sarvam','queued','system','{"sarvam_campaign_id":"old-camp"}', now() - interval '1 hour'), ('${moved}','resubmitted_to_sarvam','queued','system','{"sarvam_campaign_id":"new-camp","replaced_campaign_id":"old-camp"}', now())`);
+  [s, j] = await post({ campaign_id: 'old-camp', attempt_id: 'att-old', completion_status: 'failed', failure_reason: 'Campaign Cancelled', user_identifier: `call:${moved}`, user_phone_number: '+919848012345', app_id: 'Conversatio-ef4d6b32-0d9b' });
+  ok(s === 200 && sql(`select status||'|'||coalesce(provider_call_id,'-') from calls where id='${moved}'`) === 'queued|-', 'cancelled attempt from a replaced campaign does not fail the call');
+  [s, j] = await post({ campaign_id: 'new-camp', attempt_id: 'att-new', completion_status: 'completed', connectivity_status: 'connected', user_identifier: `call:${moved}`, user_phone_number: '+919848012345', app_id: 'Conversatio-ef4d6b32-0d9b', duration: 40, start_datetime: '2026-11-08T11:00:00Z', end_datetime: '2026-11-08T11:00:40Z' });
+  ok(s === 200 && sql(`select status||'|'||provider_call_id from calls where id='${moved}'`) === 'completed|att-new' && sql(`select count(*) from calls where provider_call_id in ('att-old','att-new')`) === '1', 'attempt from the current campaign updates the same call (no duplicate)');
   [s] = await post({ foo: 'bar' }); ok(s === 500, `unknown payload rejected (${s})`);
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
