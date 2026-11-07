@@ -697,7 +697,8 @@ function contactsCsv() {
     assert((await admin.page.locator('[data-testid=calls-table] tbody tr').count()) === 1, 'live scope');
     await goto(admin.page, '/calls?sort=duration_seconds&dir=desc');
     const top = sql('select max(duration_seconds) from calls where answered_at is not null');
-    const firstDur = await admin.page.locator('[data-testid=calls-table] tbody tr').first().locator('td').nth(5).textContent();
+    const durCol = await admin.page.locator('[data-testid=calls-table] thead th').evaluateAll((ths) => ths.findIndex((th) => /duration/i.test(th.textContent)));
+    const firstDur = await admin.page.locator('[data-testid=calls-table] tbody tr').first().locator('td').nth(durCol).textContent();
     const m = /(?:(\d+)m )?(\d+)s/.exec(firstDur);
     assert(m && Number(m[1] || 0) * 60 + Number(m[2]) === Number(top), `first ${firstDur} vs ${top}`);
     await goto(admin.page, '/calls?recording=yes');
@@ -898,6 +899,23 @@ function contactsCsv() {
     await admin.page.getByTestId('delete-call-confirm').click();
     await admin.page.waitForURL(/\/calls\?deleted=1/);
     assert(sql(`select count(*) from calls where id='${victim}'`) === '0', 'not deleted');
+    assert(sql('select (min(call_number) = 1 and max(call_number) = count(*))::text from calls') === 'true', 'Call IDs have gaps after delete');
+  });
+  await step('Admin: bulk delete selected calls from Call Logs, IDs renumbered', async () => {
+    const before = Number(sql('select count(*) from calls'));
+    await goto(admin.page, '/calls');
+    await admin.page.getByTestId('bulk-call-actions').waitFor();
+    const boxes = admin.page.locator('[data-testid=calls-table] tbody input[type=checkbox]');
+    await boxes.nth(0).check();
+    await boxes.nth(1).check();
+    await admin.page.getByText('2 selected').waitFor();
+    await admin.page.getByTestId('bulk-delete-calls').click();
+    await admin.page.getByTestId('bulk-delete-calls-confirm').click();
+    await toast(admin.page, 'success', /2 calls deleted/);
+    assert(Number(sql('select count(*) from calls')) === before - 2, 'bulk delete count');
+    assert(sql('select (min(call_number) = 1 and max(call_number) = count(*))::text from calls') === 'true', 'Call IDs have gaps after bulk delete');
+    await goto(agent.page, '/calls');
+    assert((await agent.page.getByTestId('bulk-call-actions').count()) === 0, 'bulk delete visible to agent');
   });
   await step('Manager-only delete of contact (admin) works and unlinks calls', async () => {
     const id = sql("select id from contacts where full_name='Walk-in Caller'");

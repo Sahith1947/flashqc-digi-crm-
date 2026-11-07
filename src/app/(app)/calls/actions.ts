@@ -160,10 +160,28 @@ export async function deleteCall(callId: string): Promise<ActionResult> {
     if (!data?.length) throw new AppError('Call not found or you lack permission.');
     revalidatePath('/calls');
     revalidatePath('/');
-    return { ok: true, message: 'Call deleted.' };
+    return { ok: true, message: 'Call deleted. Call IDs were renumbered.' };
   });
   if (res.ok) redirect('/calls?deleted=1');
   return res;
+}
+
+/** Deletes several calls (Call Logs bulk action). Remaining Call IDs are renumbered by the database. */
+export async function deleteCalls(callIds: string[]): Promise<ActionResult> {
+  return runAction(async () => {
+    const { db } = await assertRole('admin');
+    const ids = z.array(uuid).min(1, 'Select at least one call.').max(500, 'Delete at most 500 calls at a time.').parse(callIds);
+    const { data: recs } = await db.from('call_recordings').select('id').in('call_id', ids);
+    for (const r of recs ?? []) await RecordingService.remove(db, r.id);
+    const { data, error } = await db.from('calls').delete().in('id', ids).select('id');
+    if (error) throw error;
+    if (!data?.length) throw new AppError('Those calls were not found or you lack permission.');
+    revalidatePath('/calls');
+    revalidatePath('/recordings');
+    revalidatePath('/');
+    const n = data.length;
+    return { ok: true, message: `${n} call${n === 1 ? '' : 's'} deleted. Call IDs were renumbered so there are no gaps.` };
+  });
 }
 
 export async function checkSarvamRecording(callId: string): Promise<ActionResult> {

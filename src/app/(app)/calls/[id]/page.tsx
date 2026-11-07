@@ -85,7 +85,7 @@ export default async function CallDetailPage(props: PageProps<'/calls/[id]'>) {
               label="Delete call"
               icon={<Trash2 className="size-4" />}
               title="Delete this call?"
-              description="The call, its events, recordings, transcript and summary will be permanently deleted. This cannot be undone."
+              description="The call, its events, recordings, transcript and summary will be permanently deleted. Later Call IDs move up by one so there are no gaps. This cannot be undone."
               confirmLabel="Delete permanently"
               testId="delete-call"
             />

@@ -11,11 +11,14 @@ import { buttonClass } from '@/components/ui/button';
 import { CallsTable } from '@/components/calls/calls-table';
 import { CallFilterBar } from '@/components/calls/call-filters';
 import { scheduleRecordingSweep } from '@/server/recording-sync';
+import { BulkCallActions } from '@/components/calls/bulk-call-actions';
+import { hasMinRole } from '@/lib/constants';
 
 export const metadata: Metadata = { title: 'Call Logs' };
 
 export default async function CallLogsPage(props: PageProps<'/calls'>) {
-  const { db } = await requireMember();
+  const { db, profile } = await requireMember();
+  const canAdmin = hasMinRole(profile.role, 'admin');
   const params = flatParams(await props.searchParams);
   const [{ rows, total, page, filters }, campaigns] = await Promise.all([listCalls(db, params), campaignOptions(db)]);
   scheduleRecordingSweep();
@@ -37,7 +40,8 @@ export default async function CallLogsPage(props: PageProps<'/calls'>) {
         </div>
         {rows.length ? (
           <>
-            <CallsTable rows={rows} sort={{ params, basePath: '/calls' }} />
+            {canAdmin && <BulkCallActions />}
+            <CallsTable rows={rows} sort={{ params, basePath: '/calls' }} selectable={canAdmin} />
             <Pagination page={page} pageSize={CALLS_PAGE_SIZE} total={total} params={params} basePath="/calls" />
           </>
         ) : (

@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { FileText, Sparkles } from 'lucide-react';
 import { RecordingPlayButton } from './recording-play-button';
+import { SelectAllCalls } from './bulk-call-actions';
+import { BULK_FORM_ID } from './bulk-form-id';
 import type { CallLogRow } from '@/lib/supabase/types';
 import { CALL_OUTCOME_LABELS, labelFor } from '@/lib/constants';
 import { formatDateTime, formatDuration } from '@/lib/dates';
@@ -20,10 +22,13 @@ export function CallsTable({
   rows,
   hide = [],
   sort,
+  selectable = false,
 }: {
   rows: CallLogRow[];
   hide?: Column[];
   sort?: { params: Record<string, string | undefined>; basePath: string };
+  /** Adds tick boxes for the bulk actions toolbar (BulkCallActions must be on the page). */
+  selectable?: boolean;
 }) {
   const show = (c: Column) => !hide.includes(c);
   const header = (label: string, col: (typeof CALL_SORTS)[number]) =>
@@ -33,6 +38,11 @@ export function CallsTable({
       <Table data-testid="calls-table">
         <thead>
           <tr>
+            {selectable && (
+              <Th className="w-10">
+                <SelectAllCalls />
+              </Th>
+            )}
             {header('Call ID', 'call_number')}
             <Th>Contact</Th>
             {show('business') && <Th>Business</Th>}
@@ -48,6 +58,11 @@ export function CallsTable({
         <tbody>
           {rows.map((c) => (
             <Tr key={c.id}>
+              {selectable && (
+                <Td className="w-10">
+                  <input type="checkbox" form={BULK_FORM_ID} name="ids" value={c.id!} aria-label={`Select ${callRef(c.call_number)}`} className="size-4 accent-brand-600" />
+                </Td>
+              )}
               <Td className="whitespace-nowrap">
                 <Link href={`/calls/${c.id}`} className="font-mono text-xs font-medium text-brand-700 hover:underline">
                   {callRef(c.call_number)}

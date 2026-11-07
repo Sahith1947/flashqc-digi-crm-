@@ -242,5 +242,15 @@ select pg_temp.act_as('00000000-0000-0000-0000-00000000000d');
 select pg_temp.expect((select total_calls = 2 and last_call_status is not null from public.contacts_with_stats where phone_e164 = '+919800000004'),
   'contacts_with_stats computes total calls and last status');
 
+-- Call IDs stay continuous after deletes, and cannot be edited by users.
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000c');
+select pg_temp.expect_error($$update public.calls set call_number = 999 where call_number = 1$$, 'agent cannot change a Call ID');
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000a');
+select pg_temp.expect_error($$update public.calls set call_number = 999 where call_number = 1$$, 'admin cannot change a Call ID by hand');
+delete from public.calls where call_number in (select min(call_number) from public.calls);
+select pg_temp.expect((select min(call_number) = 1 and max(call_number) = count(*) from public.calls), 'Call IDs are renumbered 1..N after an admin deletes a call');
+insert into public.calls (direction, status, phone_e164, is_simulated) values ('outbound', 'completed', '+919800000008', true);
+select pg_temp.expect((select call_number = (select count(*) from public.calls) from public.calls where phone_e164 = '+919800000008'), 'new call takes the next Call ID');
+
 rollback;
 \echo 'ALL DATABASE TESTS PASSED'
