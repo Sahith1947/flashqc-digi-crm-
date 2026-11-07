@@ -1,26 +1,65 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* FlashQC Digi design tokens — orange / black / white */
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --color-brand-50: #fff5ed;
+  --color-brand-100: #ffe8d4;
+  --color-brand-200: #ffcda8;
+  --color-brand-300: #fea970;
+  --color-brand-400: #fd7c37;
+  --color-brand-500: #f9620f;
+  --color-brand-600: #ea4a06;
+  --color-brand-700: #c23507;
+  --color-brand-800: #9a2b0e;
+  --color-brand-900: #7c270f;
+
+  --color-ink: #0b0b0b;
+  --color-ink-2: #52514e;
+  --color-ink-3: #77756f;
+  --color-surface: #ffffff;
+  --color-canvas: #f6f6f4;
+  --color-line: #e7e6e2;
+  --color-line-strong: #d5d4cf;
+
+  /* chart roles (validated categorical + reserved status palette) */
+  --color-series-inbound: #2a78d6;
+  --color-series-outbound: #eb6834;
+  --color-status-good: #0ca30c;
+  --color-status-warning: #fab219;
+  --color-status-serious: #ec835a;
+  --color-status-critical: #d03b3b;
+  --color-grid: #ecebe7;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+html {
+  color-scheme: light;
 }
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+:focus-visible {
+  outline: 2px solid var(--color-brand-500);
+  outline-offset: 2px;
+}
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+dialog::backdrop {
+  background: rgb(11 11 11 / 0.45);
+}
+/* Grid items must be allowed to shrink so wide tables scroll inside their card instead of widening the page. */
+.grid > * {
+  min-width: 0;
+}
+/* Scroll containers must contain absolutely positioned descendants (e.g. sr-only labels in table cells),
+   otherwise those escape the clip and widen the page on mobile. */
+.overflow-x-auto,
+.overflow-auto {
+  position: relative;
 }
