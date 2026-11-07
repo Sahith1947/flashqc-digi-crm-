@@ -79,3 +79,10 @@ npm run db:reset && npm run test:db && npm run test:unit
 npm run build && npm start            # in another terminal
 npm run test:e2e                      # requires a freshly reset DB
 ```
+
+## Update: continuous Call IDs, bulk delete, superseded Sarvam attempts
+
+- Call IDs (CL-000001 …) are renumbered 1..N in original order after any delete; new calls take N+1. Users (even admins) cannot edit a Call ID by hand. Covered by `npm run test:db`.
+- Call Logs has tick boxes and **Delete selected** for admins (hidden for other roles). Covered by e2e step "Admin: bulk delete selected calls…" (86/86 e2e steps pass).
+- Sarvam attempts from a replaced campaign ("Campaign Cancelled") no longer fail a re-queued live call; the real attempt updates the same call. Covered by `npm run test:webhooks` (29/29).
+- Recordings: Sarvam's analytics report returns `audio_url: null` for every interaction in this workspace (checked 8 Nov 2026), and its MCP has no recording setting. Recordings need Sarvam support to enable them, or Vobiz trunk recording with Vobiz API keys.
