@@ -9,6 +9,10 @@ export const serverEnv = {
   sarvamApiKey: process.env.SARVAM_API_KEY ?? '',
   telephonyWebhookSecret: process.env.TELEPHONY_WEBHOOK_SECRET ?? '',
   cronSecret: process.env.CRON_SECRET ?? '',
+  /** 32 random bytes, base64. Encrypts provider OAuth tokens stored in the database. */
+  integrationEncryptionKey: process.env.INTEGRATION_ENCRYPTION_KEY ?? '',
+  /** Sarvam voice-agents MCP endpoint. */
+  sarvamMcpUrl: (process.env.SARVAM_MCP_URL ?? 'https://mcp.sarvam.ai/voice-agents').replace(/\/$/, ''),
 };
 
 /** Which credentials are present (booleans only – safe to show in the UI). */
@@ -19,5 +23,6 @@ export function credentialPresence() {
     SARVAM_API_KEY: Boolean(serverEnv.sarvamApiKey),
     TELEPHONY_WEBHOOK_SECRET: Boolean(serverEnv.telephonyWebhookSecret),
     CRON_SECRET: Boolean(serverEnv.cronSecret),
+    INTEGRATION_ENCRYPTION_KEY: Boolean(serverEnv.integrationEncryptionKey),
   };
 }

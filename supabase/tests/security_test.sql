@@ -155,6 +155,26 @@ select pg_temp.expect_error($$update public.app_settings set company_name = 'X'$
   'manager cannot change org settings');
 
 -- ---------------------------------------------------------------------------
+-- Sarvam integration: tokens are backend-only; synced fields are backend-only
+-- ---------------------------------------------------------------------------
+select pg_temp.as_backend();
+insert into public.integration_credentials (key, ciphertext) values ('sarvam_ai', 'v1.x.y.z');
+insert into public.voice_agents (name, provider, provider_agent_id, provider_status, provider_synced_at, connection_status)
+  values ('Synced Agent', 'sarvam', 'Conv-123', 'draft', now(), 'connected');
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000a');
+select pg_temp.expect_error($$select * from public.integration_credentials$$, 'admin session cannot read stored provider tokens');
+select pg_temp.expect_error($$delete from public.integration_credentials$$, 'admin session cannot delete stored provider tokens');
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000b');
+select pg_temp.expect_error($$update public.voice_agents set provider_status = 'deployed' where name = 'Synced Agent'$$, 'manager cannot fake Sarvam agent status');
+select pg_temp.expect_error($$update public.voice_agents set provider_agent_id = 'other' where name = 'Synced Agent'$$, 'manager cannot re-point a synced agent');
+update public.voice_agents set status = 'ready', instructions = 'CRM notes' where name = 'Synced Agent';
+select pg_temp.expect((select status = 'ready' from public.voice_agents where name = 'Synced Agent'), 'manager can edit CRM-side fields of synced agent');
+insert into public.voice_agents (name, provider_status, provider_synced_at) values ('Sneaky', 'deployed', now());
+select pg_temp.expect((select provider_status is null and provider_synced_at is null from public.voice_agents where name = 'Sneaky'), 'insert cannot claim synced provider state');
+insert into public.phone_numbers (label, phone_e164, provider) values ('Vobiz line', '+914099999999', 'vobiz');
+select pg_temp.expect_error($$update public.phone_numbers set provider_synced_at = now() where label = 'Vobiz line'$$, 'manager cannot fake number sync');
+
+-- ---------------------------------------------------------------------------
 -- Admin: integrations config (not status), audit log
 -- ---------------------------------------------------------------------------
 select pg_temp.act_as('00000000-0000-0000-0000-00000000000a');

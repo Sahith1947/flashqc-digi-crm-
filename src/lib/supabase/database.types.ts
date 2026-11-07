@@ -337,6 +337,20 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"integration_credentials": {
+                  Row: {
+                    "ciphertext": string,"created_at": string,"key": string,"metadata": NonNullable<Json>,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "ciphertext": string,"created_at"?: string,"key": string,"metadata"?: NonNullable<Json>,"updated_at"?: string
+                  }
+                  Update: {
+                    "ciphertext"?: string,"created_at"?: string,"key"?: string,"metadata"?: NonNullable<Json>,"updated_at"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"integrations": {
                   Row: {
                     "config": NonNullable<Json>,"created_at": string,"display_name": string,"id": string,"key": string,"last_checked_at": string | null,"last_error": string | null,"provider": string | null,"status": string,"updated_at": string
@@ -353,14 +367,14 @@ isOneToOne: false
                   ]
                 },"phone_numbers": {
                   Row: {
-                    "can_inbound": boolean,"can_outbound": boolean,"connection_status": string,"created_at": string,"created_by": string | null,"enabled": boolean,"id": string,"label": string,"phone_e164": string,"provider": string,"provider_number_id": string | null,"updated_at": string,"voice_agent_id": string | null
+                    "can_inbound": boolean,"can_outbound": boolean,"connection_status": string,"created_at": string,"created_by": string | null,"enabled": boolean,"id": string,"label": string,"phone_e164": string,"provider": string,"provider_connection_id": string | null,"provider_number_id": string | null,"provider_synced_at": string | null,"updated_at": string,"voice_agent_id": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "can_inbound"?: boolean,"can_outbound"?: boolean,"connection_status"?: string,"created_at"?: string,"created_by"?: string | null,"enabled"?: boolean,"id"?: string,"label": string,"phone_e164": string,"provider"?: string,"provider_number_id"?: string | null,"updated_at"?: string,"voice_agent_id"?: string | null
+                    "can_inbound"?: boolean,"can_outbound"?: boolean,"connection_status"?: string,"created_at"?: string,"created_by"?: string | null,"enabled"?: boolean,"id"?: string,"label": string,"phone_e164": string,"provider"?: string,"provider_connection_id"?: string | null,"provider_number_id"?: string | null,"provider_synced_at"?: string | null,"updated_at"?: string,"voice_agent_id"?: string | null
                   }
                   Update: {
-                    "can_inbound"?: boolean,"can_outbound"?: boolean,"connection_status"?: string,"created_at"?: string,"created_by"?: string | null,"enabled"?: boolean,"id"?: string,"label"?: string,"phone_e164"?: string,"provider"?: string,"provider_number_id"?: string | null,"updated_at"?: string,"voice_agent_id"?: string | null
+                    "can_inbound"?: boolean,"can_outbound"?: boolean,"connection_status"?: string,"created_at"?: string,"created_by"?: string | null,"enabled"?: boolean,"id"?: string,"label"?: string,"phone_e164"?: string,"provider"?: string,"provider_connection_id"?: string | null,"provider_number_id"?: string | null,"provider_synced_at"?: string | null,"updated_at"?: string,"voice_agent_id"?: string | null
                   }
                   Relationships: [
                     {
@@ -413,14 +427,14 @@ isOneToOne: false
                   ]
                 },"voice_agents": {
                   Row: {
-                    "connection_status": string,"created_at": string,"created_by": string | null,"description": string | null,"greeting": string | null,"id": string,"instructions": string | null,"language": string,"name": string,"provider": string,"provider_agent_id": string | null,"status": string,"updated_at": string,"voice": string | null
+                    "connection_status": string,"created_at": string,"created_by": string | null,"description": string | null,"greeting": string | null,"id": string,"instructions": string | null,"language": string,"name": string,"provider": string,"provider_agent_id": string | null,"provider_deployed": boolean | null,"provider_status": string | null,"provider_synced_at": string | null,"provider_version": number | null,"status": string,"updated_at": string,"voice": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "connection_status"?: string,"created_at"?: string,"created_by"?: string | null,"description"?: string | null,"greeting"?: string | null,"id"?: string,"instructions"?: string | null,"language"?: string,"name": string,"provider"?: string,"provider_agent_id"?: string | null,"status"?: string,"updated_at"?: string,"voice"?: string | null
+                    "connection_status"?: string,"created_at"?: string,"created_by"?: string | null,"description"?: string | null,"greeting"?: string | null,"id"?: string,"instructions"?: string | null,"language"?: string,"name": string,"provider"?: string,"provider_agent_id"?: string | null,"provider_deployed"?: boolean | null,"provider_status"?: string | null,"provider_synced_at"?: string | null,"provider_version"?: number | null,"status"?: string,"updated_at"?: string,"voice"?: string | null
                   }
                   Update: {
-                    "connection_status"?: string,"created_at"?: string,"created_by"?: string | null,"description"?: string | null,"greeting"?: string | null,"id"?: string,"instructions"?: string | null,"language"?: string,"name"?: string,"provider"?: string,"provider_agent_id"?: string | null,"status"?: string,"updated_at"?: string,"voice"?: string | null
+                    "connection_status"?: string,"created_at"?: string,"created_by"?: string | null,"description"?: string | null,"greeting"?: string | null,"id"?: string,"instructions"?: string | null,"language"?: string,"name"?: string,"provider"?: string,"provider_agent_id"?: string | null,"provider_deployed"?: boolean | null,"provider_status"?: string | null,"provider_synced_at"?: string | null,"provider_version"?: number | null,"status"?: string,"updated_at"?: string,"voice"?: string | null
                   }
                   Relationships: [
                     {

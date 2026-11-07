@@ -5,6 +5,10 @@ import type { ActionResult } from '@/lib/action-result';
 import { assertRole } from '@/server/auth';
 import { formOptional, runAction } from '@/server/action-utils';
 import { IntegrationService } from '@/server/services/integration-service';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { SarvamAuth } from '@/server/providers/sarvam/auth';
+import { SarvamService } from '@/server/services/sarvam-service';
+import { AppError } from '@/server/providers/types';
 
 const keySchema = z.enum(['sarvam_ai', 'telephony', 'recording_storage']);
 
@@ -37,5 +41,92 @@ export async function saveIntegrationConfig(key: string, _prev: ActionResult | n
     if (!data?.length) return { ok: false, error: 'Integration not found.' };
     revalidatePath('/integrations');
     return { ok: true, message: 'Integration notes saved.' };
+  });
+}
+
+// ---------------------------------------------------------------- Sarvam AI
+
+function backend() {
+  const admin = createAdminClient();
+  if (!admin) throw new AppError('SUPABASE_SECRET_KEY is not set on the server.');
+  return admin;
+}
+
+function refreshSarvamPages() {
+  revalidatePath('/integrations');
+  revalidatePath('/voice-agents');
+  revalidatePath('/phone-numbers');
+}
+
+export async function startSarvamConnect(): Promise<ActionResult<{ userCode: string; verifyUrl: string }>> {
+  return runAction(async () => {
+    await assertRole('admin');
+    const res = await SarvamAuth.startConnect(backend());
+    return { ok: true, message: 'Approve the code on Sarvam to finish connecting.', data: res };
+  });
+}
+
+type PollState = 'waiting' | 'connected' | 'expired' | 'none';
+export async function pollSarvamConnect(): Promise<ActionResult<{ state: PollState }>> {
+  return runAction<{ state: PollState }>(async () => {
+    await assertRole('admin');
+    const admin = backend();
+    const state = await SarvamAuth.pollConnect(admin);
+    if (state === 'connected') {
+      // Verify immediately and record the verified status.
+      await IntegrationService.check(admin, 'sarvam_ai');
+      refreshSarvamPages();
+      return { ok: true, message: 'Sarvam connected.', data: { state } };
+    }
+    if (state === 'expired') return { ok: false, error: 'The sign-in code expired or was declined. Start again.' };
+    return { ok: true, message: '', data: { state } };
+  });
+}
+
+export async function cancelSarvamConnect(): Promise<ActionResult> {
+  return runAction(async () => {
+    await assertRole('admin');
+    await SarvamAuth.cancelConnect(backend());
+    refreshSarvamPages();
+    return { ok: true, message: 'Sign-in cancelled.' };
+  });
+}
+
+export async function disconnectSarvam(): Promise<ActionResult> {
+  return runAction(async () => {
+    await assertRole('admin');
+    const admin = backend();
+    await SarvamAuth.disconnect(admin);
+    await admin.from('integrations').update({ status: 'not_configured', last_error: 'Disconnected by an admin', last_checked_at: new Date().toISOString() }).in('key', ['sarvam_ai', 'telephony']);
+    await admin.from('voice_agents').update({ connection_status: 'not_connected' }).eq('provider', 'sarvam').not('provider_synced_at', 'is', null);
+    refreshSarvamPages();
+    return { ok: true, message: 'Sarvam disconnected. Stored tokens were deleted.' };
+  });
+}
+
+export async function syncSarvamAgents(): Promise<ActionResult> {
+  return runAction(async () => {
+    await assertRole('manager');
+    const r = await SarvamService.syncAgents(backend());
+    refreshSarvamPages();
+    return {
+      ok: true,
+      message: `Synced ${r.total} agent${r.total === 1 ? '' : 's'} from Sarvam (${r.created} new, ${r.updated} updated${r.missing ? `, ${r.missing} no longer in Sarvam` : ''}).`,
+    };
+  });
+}
+
+export async function syncSarvamNumbers(): Promise<ActionResult> {
+  return runAction(async () => {
+    await assertRole('manager');
+    const r = await SarvamService.syncNumbers(backend());
+    refreshSarvamPages();
+    const conns = r.connectionSummary.map((c) => `${c.provider}: ${c.status.replace(/_/g, ' ')}`).join(', ') || 'none';
+    return {
+      ok: true,
+      message: r.imported
+        ? `Imported ${r.imported} number${r.imported === 1 ? '' : 's'} from Sarvam (connections: ${conns}).`
+        : `No numbers are onboarded in Sarvam yet (connections: ${conns}). Onboard a number in Sarvam, then sync again.`,
+    };
   });
 }

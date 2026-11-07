@@ -75,6 +75,11 @@ function VoiceAgentForm({ a, onDone }: { a?: VoiceAgent; onDone: () => void }) {
   const { formAction, pending, fe } = useModalForm(saveVoiceAgent.bind(null, a?.id ?? null) as Bound, onDone);
   return (
     <form onSubmit={formAction} className="space-y-4" data-testid="voice-agent-form">
+      {a?.provider_synced_at && (
+        <p className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+          This agent is synced from Sarvam. Name, language, greeting and description are overwritten on the next sync — change them in Sarvam. CRM status and instructions notes stay as you set them.
+        </p>
+      )}
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Agent name" htmlFor="va_name" error={fe?.name} required>
           <Input id="va_name" name="name" defaultValue={a?.name ?? ''} required maxLength={120} placeholder="e.g. Priya – Sales (Telugu)" />
@@ -106,8 +111,8 @@ function VoiceAgentForm({ a, onDone }: { a?: VoiceAgent; onDone: () => void }) {
             <option value="other">Other</option>
           </Select>
         </Field>
-        <Field label="Provider agent ID" htmlFor="va_pid" hint="Filled automatically after sync in Phase 2">
-          <Input id="va_pid" name="provider_agent_id" defaultValue={a?.provider_agent_id ?? ''} maxLength={200} />
+        <Field label="Provider agent ID" htmlFor="va_pid" hint="Set automatically by Sarvam sync">
+          <Input id="va_pid" name="provider_agent_id" defaultValue={a?.provider_agent_id ?? ''} maxLength={200} readOnly={Boolean(a?.provider_synced_at)} />
         </Field>
         <Field label="Description" htmlFor="va_desc" className="sm:col-span-2">
           <Input id="va_desc" name="description" defaultValue={a?.description ?? ''} maxLength={1000} />

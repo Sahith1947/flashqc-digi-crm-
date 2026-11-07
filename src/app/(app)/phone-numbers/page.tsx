@@ -11,6 +11,11 @@ import { EmptyState, Notice } from '@/components/ui/states';
 import { Table, TableWrap, Td, Th, Tr } from '@/components/ui/table';
 import { ConfirmAction } from '@/components/ui/confirm-action';
 import { PhoneNumberButton } from '@/components/config/config-forms';
+import { ActionButton } from '@/components/config/sarvam-connect';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { SarvamAuth } from '@/server/providers/sarvam/auth';
+import { serverEnv } from '@/server/env';
+import { syncSarvamNumbers } from '../integrations/actions';
 import { deletePhoneNumber } from './actions';
 
 export const metadata: Metadata = { title: 'Phone Numbers' };
@@ -24,15 +29,28 @@ export default async function PhoneNumbersPage() {
   if (error) throw error;
   const canManage = hasMinRole(profile.role, 'manager');
   const canAdmin = hasMinRole(profile.role, 'admin');
+  const admin = createAdminClient();
+  const sarvam = admin && serverEnv.integrationEncryptionKey ? await SarvamAuth.status(admin) : null;
   return (
     <>
       <PageHeader
         title="Phone Numbers"
         description="Business phone lines used for inbound and outbound calling."
-        actions={canManage ? <PhoneNumberButton agents={agents} /> : undefined}
+        actions={
+          canManage ? (
+            <>
+              {sarvam?.connected && <ActionButton action={syncSarvamNumbers} label="Sync from Sarvam" testId="sync-numbers" variant="primary" />}
+              <PhoneNumberButton agents={agents} />
+            </>
+          ) : undefined
+        }
       />
       <Notice tone="info" className="mb-4">
-        Numbers are configuration placeholders until the telephony provider is integrated. <strong>Connection</strong> shows &quot;Connected&quot; only after the provider verifies the number — it cannot be set manually.
+        {sarvam?.connected ? (
+          <>Numbers onboarded in your Sarvam telephony connection are imported with <strong>Sync from Sarvam</strong> and show &quot;Connected&quot;. Numbers added here manually stay &quot;Not connected&quot; until they exist in Sarvam — connection status cannot be set by hand.</>
+        ) : (
+          <>Numbers are configuration placeholders until Sarvam is connected. <strong>Connection</strong> shows &quot;Connected&quot; only after the provider verifies the number — it cannot be set manually.</>
+        )}
       </Notice>
       <Card>
         {data.length ? (

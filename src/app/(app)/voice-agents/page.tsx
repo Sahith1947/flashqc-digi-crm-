@@ -1,12 +1,17 @@
 import type { Metadata } from 'next';
-import { Bot, RefreshCw, Trash2 } from 'lucide-react';
+import { Bot, Trash2 } from 'lucide-react';
 import { requireMember } from '@/server/auth';
-import { VoiceAgentService } from '@/server/services/voice-agent-service';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { SarvamAuth } from '@/server/providers/sarvam/auth';
+import { serverEnv } from '@/server/env';
+import { formatDateTime } from '@/lib/dates';
+import { ActionButton } from '@/components/config/sarvam-connect';
+import { syncSarvamAgents } from '../integrations/actions';
+import Link from 'next/link';
 import { AGENT_LANGUAGES, AGENT_STATUS_LABELS, CONNECTION_STATUS_LABELS, CONNECTION_STATUS_TONE, hasMinRole, labelFor } from '@/lib/constants';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardBody } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { EmptyState, Notice } from '@/components/ui/states';
 import { ConfirmAction } from '@/components/ui/confirm-action';
 import { VoiceAgentButton } from '@/components/config/config-forms';
@@ -28,15 +33,33 @@ export default async function VoiceAgentsPage() {
   usage?.forEach((c) => c.voice_agent_id && callsByAgent.set(c.voice_agent_id, (callsByAgent.get(c.voice_agent_id) ?? 0) + 1));
   const canManage = hasMinRole(profile.role, 'manager');
   const canAdmin = hasMinRole(profile.role, 'admin');
-  const syncAvailable = VoiceAgentService.isSyncAvailable();
+  const admin = createAdminClient();
+  const sarvam = admin && serverEnv.integrationEncryptionKey ? await SarvamAuth.status(admin) : null;
   const langLabel = (v: string) => AGENT_LANGUAGES.find((l) => l.value === v)?.label ?? v;
 
   return (
     <>
-      <PageHeader title="Voice Agents" description="AI voice agent configurations. They connect to Sarvam AI in Phase 2." actions={canManage ? <VoiceAgentButton /> : undefined} />
-      <Notice tone="info" className="mb-4">
-        Agents are stored as provider-independent configurations. Syncing to Sarvam AI and the &quot;Connected&quot; status are enabled only after the official Sarvam documentation is integrated.
-      </Notice>
+      <PageHeader
+        title="Voice Agents"
+        description="AI voice agents. Sarvam agents are synced from your Sarvam workspace; their prompt and voice are edited in Sarvam."
+        actions={
+          canManage ? (
+            <>
+              {sarvam?.connected && <ActionButton action={syncSarvamAgents} label="Sync from Sarvam" testId="sync-agents" variant="primary" />}
+              <VoiceAgentButton />
+            </>
+          ) : undefined
+        }
+      />
+      {sarvam?.connected ? (
+        <Notice tone="info" className="mb-4">
+          Connected to Sarvam as <strong>{sarvam.accountEmail}</strong>. &quot;Connected&quot; on an agent means it was verified in your Sarvam workspace at the last sync. Sync reads from Sarvam only — it never changes your Sarvam agents.
+        </Notice>
+      ) : (
+        <Notice tone="warning" className="mb-4">
+          Sarvam is not connected. {canManage ? <>An admin can connect it on <Link href="/integrations" className="font-medium underline">Integrations</Link>.</> : 'Ask an admin to connect it.'}
+        </Notice>
+      )}
       {agents.length ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3" data-testid="agents-grid">
           {agents.map((a) => (
@@ -57,6 +80,16 @@ export default async function VoiceAgentsPage() {
                   <Badge tone={a.status === 'ready' ? 'good' : a.status === 'disabled' ? 'neutral' : 'warning'}>{labelFor(AGENT_STATUS_LABELS, a.status)}</Badge>
                 </div>
                 {a.description && <p className="text-sm text-ink-2">{a.description}</p>}
+                {a.provider_synced_at && (
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs" data-testid="sarvam-agent-meta">
+                    <Badge tone={a.provider_deployed ? 'good' : 'warning'}>{a.provider_deployed ? 'Deployed in Sarvam' : 'Not deployed'}</Badge>
+                    <Badge tone="neutral" icon={false}>
+                      Sarvam {a.provider_status ?? '—'} · v{a.provider_version ?? '—'}
+                    </Badge>
+                    <span className="text-ink-3">synced {formatDateTime(a.provider_synced_at)}</span>
+                  </div>
+                )}
+                {a.provider_agent_id && <p className="font-mono text-[11px] text-ink-3">{a.provider_agent_id}</p>}
                 {a.greeting && <p className="rounded-lg bg-canvas px-3 py-2 text-sm text-ink-2 italic">&ldquo;{a.greeting}&rdquo;</p>}
                 <dl className="grid grid-cols-3 gap-2 text-center text-xs">
                   <div className="rounded-lg border border-line p-2">
@@ -77,9 +110,6 @@ export default async function VoiceAgentsPage() {
                 {canManage && (
                   <div className="flex flex-wrap gap-2 pt-1">
                     <VoiceAgentButton a={a} />
-                    <Button variant="secondary" size="sm" icon={<RefreshCw className="size-3.5" />} disabled title="Available after the Sarvam AI integration (Phase 2)">
-                      {syncAvailable ? 'Sync to Sarvam' : 'Sync (Phase 2)'}
-                    </Button>
                     {canAdmin && (
                       <ConfirmAction
                         action={deleteVoiceAgent.bind(null, a.id)}

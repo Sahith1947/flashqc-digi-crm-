@@ -134,10 +134,11 @@ export const CAMPAIGN_CONTACT_STATUS_TONE: Record<string, Tone> = {
   skipped: 'warning',
 };
 
-export const PHONE_PROVIDERS = ['unassigned', 'sarvam', 'exotel', 'twilio', 'plivo', 'knowlarity', 'other'] as const;
+export const PHONE_PROVIDERS = ['unassigned', 'sarvam', 'vobiz', 'exotel', 'twilio', 'plivo', 'knowlarity', 'other'] as const;
 export const PHONE_PROVIDER_LABELS: Record<(typeof PHONE_PROVIDERS)[number], string> = {
   unassigned: 'Not assigned',
   sarvam: 'Sarvam AI',
+  vobiz: 'Vobiz (via Sarvam)',
   exotel: 'Exotel',
   twilio: 'Twilio',
   plivo: 'Plivo',
