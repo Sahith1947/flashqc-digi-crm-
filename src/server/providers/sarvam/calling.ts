@@ -197,11 +197,28 @@ export const SarvamCalling = {
     const c = await client(admin);
     const { data: lines } = await admin.from('phone_numbers').select('phone_e164').not('provider_connection_id', 'is', null);
     const ours = new Set((lines ?? []).map((l) => l.phone_e164));
-    const list = await c.callTool<{ items?: { deployment_id: string; name: string; phone_numbers?: string[]; status?: string }[] }>('telephony', { operation: 'list_deployments', params: { limit: 50 } });
+    const list = await c.callTool<{ items?: { deployment_id: string; name: string; app_id?: string; app_version?: number; phone_numbers?: string[]; status?: string }[] }>('telephony', { operation: 'list_deployments', params: { limit: 50 } });
     const targets = (list.items ?? []).filter((d) => (d.phone_numbers ?? []).some((p) => ours.has(p)));
     if (!targets.length) throw new AppError('No Sarvam inbound deployment uses the CRM’s numbers. Sync numbers first, or create an inbound deployment in Sarvam.');
     for (const d of targets) {
-      await c.callTool('configure_deployment', { deployment_id: d.deployment_id, webhook_config: this.webhookConfig(baseUrl, { crm_kind: 'inbound' }) });
+      try {
+        await c.callTool('configure_deployment', { deployment_id: d.deployment_id, webhook_config: this.webhookConfig(baseUrl, { crm_kind: 'inbound' }) });
+      } catch (e) {
+        const { data: agent } = await admin
+          .from('voice_agents')
+          .select('name, provider_committed_version')
+          .eq('provider', 'sarvam')
+          .eq('provider_agent_id', d.app_id ?? '')
+          .maybeSingle();
+        const published = agent?.provider_committed_version ?? null;
+        if (d.app_version && published !== null && d.app_version > published) {
+          throw new AppError(
+            `Sarvam would not update the inbound deployment "${d.name}". It answers calls with draft version ${d.app_version} of "${agent?.name ?? 'your agent'}", but the latest published version is ${published}. In Sarvam, publish the agent (so version ${d.app_version} is committed) or move the deployment to a published version, then click "Enable inbound call sync" again.`,
+            'sarvam_deployment_draft',
+          );
+        }
+        throw e;
+      }
     }
     await admin.from('app_settings').update({ sarvam_inbound_webhook_at: new Date().toISOString() }).eq('id', true);
     return { deployments: targets.map((d) => d.name) };

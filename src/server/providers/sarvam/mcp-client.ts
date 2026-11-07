@@ -79,7 +79,14 @@ export class SarvamMcpClient {
     if (!r) throw new AppError(`No response from Sarvam for ${name}.`, 'sarvam_http');
     if (r.error) throw new AppError(`Sarvam ${name} failed: ${r.error.message}`, 'sarvam_tool');
     const text = r.result?.content?.find((c) => c.type === 'text')?.text ?? '';
-    if (r.result?.isError) throw new AppError(`Sarvam ${name} failed: ${text.slice(0, 300)}`, 'sarvam_tool');
+    if (r.result?.isError) {
+      // Keep Sarvam's raw diagnostics in server logs only; show a short, readable reason.
+      console.error(`[sarvam] ${name} error:`, text.slice(0, 2000));
+      const status = /\((\d{3})\)\s*([A-Za-z ]{3,40})/.exec(text);
+      const code = /"code":\s*"([a-z_]+)"/.exec(text)?.[1];
+      const reason = status ? `${status[2].trim().toLowerCase()} (HTTP ${status[1]})` : code ? code.replace(/_/g, ' ') : 'request refused';
+      throw new AppError(`Sarvam refused ${name.replace(/_/g, ' ')}: ${reason}.`, 'sarvam_tool');
+    }
     try {
       return JSON.parse(text) as T;
     } catch {
