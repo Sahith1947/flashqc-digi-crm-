@@ -1,5 +1,5 @@
 import 'server-only';
-import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from 'node:crypto';
+import { createCipheriv, createDecipheriv, hkdfSync, randomBytes, timingSafeEqual } from 'node:crypto';
 import { serverEnv } from '@/server/env';
 
 // AES-256-GCM for secrets stored in the database (provider OAuth tokens).
@@ -38,4 +38,17 @@ export function decryptSecret(blob: string, aad: string): string {
 /** True when secrets can be encrypted (explicit key or a derivable server secret). */
 export function encryptionAvailable(): boolean {
   return Boolean(serverEnv.integrationEncryptionKey || serverEnv.supabaseJwtSecret || serverEnv.supabaseSecretKey);
+}
+
+/** Shared secret the CRM gives Sarvam in webhook metadata; Sarvam echoes it back on every delivery. */
+export function sarvamWebhookSecret(): string {
+  const base = serverEnv.integrationEncryptionKey || serverEnv.supabaseJwtSecret || serverEnv.supabaseSecretKey;
+  if (!base) throw new Error('No server secret available to derive the webhook secret.');
+  return Buffer.from(hkdfSync('sha256', base, 'flashqc-crm', 'sarvam-webhook-v1', 32)).toString('hex');
+}
+
+export function safeEqual(a: string, b: string): boolean {
+  const x = Buffer.from(a);
+  const y = Buffer.from(b);
+  return x.length === y.length && timingSafeEqual(x, y);
 }

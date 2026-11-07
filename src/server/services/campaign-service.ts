@@ -5,6 +5,8 @@ import { istTimeOfDay, isWithinWindow } from '@/lib/dates';
 import { AppError, ProviderNotConfiguredError } from '@/server/providers/types';
 import { evaluateCallable, suppressedNumbers } from './compliance';
 import { TelephonyService } from './telephony-service';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { SarvamCalling } from '@/server/providers/sarvam/calling';
 
 const TRANSITIONS: Record<string, string[]> = {
   draft: ['running', 'cancelled'],
@@ -53,9 +55,16 @@ export const CampaignService = {
       if (error) throw error;
       if (!count) throw new AppError('Add at least one contact before starting the campaign');
       if (campaign.mode === 'live') {
-        if (!TelephonyService.isLiveCallingAvailable()) throw new ProviderNotConfiguredError('Live campaign calling');
-        if (!campaign.phone_number_id) throw new AppError('Select a business phone number for a live campaign');
+        const live = await TelephonyService.liveStatus({ voiceAgentId: campaign.voice_agent_id, phoneNumberId: campaign.phone_number_id });
+        if (!live.available) throw new AppError(`Live calling is not ready: ${live.reason}`, 'live_not_ready');
+        if (live.via === 'sarvam') await this.startOnSarvam(db, campaign);
+        else if (!campaign.phone_number_id) throw new AppError('Select a business phone number for a live campaign');
       }
+    }
+    if (campaign.mode === 'live' && campaign.provider_campaign_id && (to === 'paused' || to === 'cancelled')) {
+      const admin = createAdminClient();
+      if (!admin) throw new AppError('SUPABASE_SECRET_KEY is required for live campaigns');
+      await SarvamCalling.control(admin, campaign.provider_campaign_id, to === 'paused' ? 'pause' : 'cancel');
     }
 
     const now = new Date().toISOString();
@@ -78,6 +87,74 @@ export const CampaignService = {
   },
 
   /**
+   * Creates (first start) or resumes the Sarvam campaign, then uploads every contact that
+   * passes compliance and has not been sent yet. Blocked contacts are skipped with a reason.
+   */
+  async startOnSarvam(db: DB, campaign: Awaited<ReturnType<typeof getCampaign>>) {
+    const admin = createAdminClient();
+    if (!admin) throw new AppError('SUPABASE_SECRET_KEY is required for live campaigns');
+    const r = await SarvamCalling.readiness(admin, { voiceAgentId: campaign.voice_agent_id, phoneNumberId: campaign.phone_number_id });
+    if (!r.ok) throw new AppError(`Live calling is not ready: ${r.reason}`, 'live_not_ready');
+
+    let providerId = campaign.provider_campaign_id;
+    if (!providerId) {
+      providerId = await SarvamCalling.createCampaign(admin, {
+        name: `CRM · ${campaign.name}`,
+        description: campaign.description ?? 'Bulk campaign from FlashQC Digi CRM',
+        agent: r.agent,
+        line: r.line,
+        baseUrl: r.baseUrl,
+        maxAttempts: campaign.max_attempts,
+        windowStart: campaign.calling_window_start,
+        windowEnd: campaign.calling_window_end,
+        metadata: { crm_kind: 'campaign', crm_campaign_id: campaign.id },
+      });
+      const { error } = await admin
+        .from('campaigns')
+        .update({ provider: 'sarvam', provider_campaign_id: providerId, provider_synced_at: new Date().toISOString(), voice_agent_id: r.agent.id, phone_number_id: r.line.id })
+        .eq('id', campaign.id);
+      if (error) throw error;
+    } else {
+      await SarvamCalling.control(admin, providerId, 'resume');
+    }
+
+    // Upload pending contacts (new campaign, or contacts added while paused).
+    const { data: pending, error } = await db
+      .from('campaign_contacts')
+      .select('id, contact_id, contacts(phone_e164, full_name, business_name, business_category, city, consent_status, dnd_status)')
+      .eq('campaign_id', campaign.id)
+      .eq('status', 'pending')
+      .limit(10000);
+    if (error) throw error;
+    type Row = { id: string; contacts: { phone_e164: string; full_name: string | null; business_name: string | null; business_category: string | null; city: string | null; consent_status: string; dnd_status: string } | null };
+    const rows = (pending ?? []) as unknown as Row[];
+    const suppressed = await suppressedNumbers(db, rows.map((x) => x.contacts?.phone_e164).filter((x): x is string => Boolean(x)));
+    const send: { ccId: string; user: { user_phone_number: string; user_identifier: string; app_variables: Record<string, string> } }[] = [];
+    for (const row of rows) {
+      const c = row.contacts;
+      const check = c ? evaluateCallable(suppressed.has(c.phone_e164), c) : { allowed: false, reason: 'Contact no longer exists' };
+      if (!c || !check.allowed) {
+        await db.from('campaign_contacts').update({ status: 'skipped', skip_reason: check.reason }).eq('id', row.id);
+        continue;
+      }
+      const vars: Record<string, string> = {};
+      if (c.full_name) vars.user_name = c.full_name;
+      if (c.business_name) vars.business_name = c.business_name;
+      if (c.business_category) vars.business_category = c.business_category;
+      if (c.city) vars.location = c.city;
+      send.push({ ccId: row.id, user: { user_phone_number: c.phone_e164, user_identifier: `cc:${row.id}`, app_variables: vars } });
+    }
+    if (send.length) {
+      await SarvamCalling.streamUsers(admin, providerId, `CRM ${campaign.name}`, send.map((x) => x.user));
+      const now = new Date().toISOString();
+      for (let i = 0; i < send.length; i += 500) {
+        await db.from('campaign_contacts').update({ status: 'in_progress', last_attempt_at: now }).in('id', send.slice(i, i + 500).map((x) => x.ccId)).eq('status', 'pending');
+      }
+    }
+    return { uploaded: send.length };
+  },
+
+  /**
    * Processes up to `batchSize` contacts of a running campaign.
    * Claims rows atomically (pending → in_progress) so concurrent workers never
    * dial the same contact twice. Completes the campaign when nothing is left.
@@ -86,8 +163,21 @@ export const CampaignService = {
     const campaign = await getCampaign(db, id);
     if (campaign.status !== 'running') return { processed: 0, remaining: 0, status: campaign.status, note: null as string | null };
 
+    if (campaign.mode === 'live' && campaign.provider_campaign_id) {
+      // Sarvam dials; results arrive by webhook. Only report progress here.
+      const { count: open } = await db
+        .from('campaign_contacts')
+        .select('id', { count: 'exact', head: true })
+        .eq('campaign_id', id)
+        .in('status', ['pending', 'in_progress']);
+      if (!open) {
+        await this.transition(db, id, 'completed').catch(() => undefined);
+        return { processed: 0, remaining: 0, status: 'completed', note: null };
+      }
+      return { processed: 0, remaining: open, status: 'running', note: `Sarvam is dialling — ${open} contact${open === 1 ? '' : 's'} waiting for a result. Results appear as each call ends.` };
+    }
     if (campaign.mode === 'live') {
-      if (!TelephonyService.isLiveCallingAvailable()) {
+      if (!(await TelephonyService.liveStatus()).available) {
         await this.transition(db, id, 'paused');
         throw new ProviderNotConfiguredError('Live campaign calling');
       }

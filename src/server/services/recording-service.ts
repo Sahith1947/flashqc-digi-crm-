@@ -61,12 +61,16 @@ export const RecordingService = {
   /** Short-lived signed URL for private storage, or a provider-resolved URL. Never invents URLs. */
   async getPlaybackUrl(
     db: DB,
-    rec: { storage_bucket: string | null; storage_path: string | null; provider_recording_id: string | null },
+    rec: { storage_bucket: string | null; storage_path: string | null; provider_recording_id: string | null; provider_recording_url?: string | null },
   ): Promise<PlaybackResult> {
     if (rec.storage_bucket && rec.storage_path) {
       const { data, error } = await db.storage.from(rec.storage_bucket).createSignedUrl(rec.storage_path, 60 * 60);
       if (error || !data) return { url: null, error: 'Recording file could not be loaded from storage' };
       return { url: data.signedUrl, error: null };
+    }
+    if (rec.provider_recording_url && /^https:\/\//.test(rec.provider_recording_url)) {
+      // Recording link delivered by Sarvam in the verified call webhook.
+      return { url: rec.provider_recording_url, error: null };
     }
     if (rec.provider_recording_id) {
       const provider = getRecordingSourceProvider();

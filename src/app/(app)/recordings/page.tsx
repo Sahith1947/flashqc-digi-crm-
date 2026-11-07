@@ -85,7 +85,7 @@ export default async function RecordingsPage(props: PageProps<'/recordings'>) {
           <>
             <ul className="divide-y divide-line" data-testid="recordings-list">
               {rows.map((r) => {
-                const url = r.storage_path ? signed.get(r.storage_path) : undefined;
+                const url = r.storage_path ? signed.get(r.storage_path) : (r.provider_recording_url ?? undefined);
                 return (
                   <li key={r.id} className="grid gap-3 px-5 py-4 lg:grid-cols-[1fr_minmax(280px,420px)_auto] lg:items-center">
                     <div className="min-w-0">

@@ -117,7 +117,8 @@ export const SarvamService = {
     let created = 0;
     let updated = 0;
     for (const s of summaries) {
-      const detail = await c.callTool<{ config?: SarvamAgentConfig }>('agents', { operation: 'get', id: s.app_id, params: { include: ['config'] } });
+      const detail = await c.callTool<{ config?: SarvamAgentConfig; versions?: { app_version: number; status: string }[] }>('agents', { operation: 'get', id: s.app_id, params: { include: ['config', 'versions'] } });
+      const committed = (detail.versions ?? []).filter((v) => v.status === 'committed').map((v) => v.app_version);
       const cfg = detail.config ?? (s as SarvamAgentConfig);
       const langs = cfg.language_config?.supported_languages ?? [];
       const initial = cfg.language_config?.initial_language_name ?? langs[0] ?? 'English';
@@ -130,6 +131,7 @@ export const SarvamService = {
         description: `Synced from Sarvam · ${s.channel_type} · languages: ${langs.join(', ') || initial}`.slice(0, 1000),
         provider_status: s.status,
         provider_version: s.app_version,
+        provider_committed_version: committed.length ? Math.max(...committed) : null,
         provider_deployed: Boolean(s.is_deployed),
         provider_synced_at: now,
         connection_status: 'connected' as const,

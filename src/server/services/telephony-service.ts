@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getTelephonyProvider } from '@/server/providers/registry';
 import { AppError, ProviderNotConfiguredError } from '@/server/providers/types';
 import { simulateCall } from '@/server/providers/simulator';
+import { SarvamCalling } from '@/server/providers/sarvam/calling';
 import { CallEventService } from './call-event-service';
 import { checkCallable } from './compliance';
 
@@ -35,8 +36,67 @@ async function resolveContactId(db: DB, phoneE164: string, contactId: string | n
 }
 
 export const TelephonyService = {
-  isLiveCallingAvailable(): boolean {
-    return getTelephonyProvider().configured;
+  /** Whether live calls can be placed right now, and why not. */
+  async liveStatus(opts: { voiceAgentId?: string | null; phoneNumberId?: string | null } = {}): Promise<{ available: boolean; via: 'sarvam' | 'adapter' | null; reason: string | null }> {
+    if (getTelephonyProvider().configured) return { available: true, via: 'adapter', reason: null };
+    const admin = createAdminClient();
+    if (!admin) return { available: false, via: null, reason: 'SUPABASE_SECRET_KEY is not set on the server.' };
+    try {
+      const r = await SarvamCalling.readiness(admin, opts);
+      return r.ok ? { available: true, via: 'sarvam', reason: null } : { available: false, via: null, reason: r.reason };
+    } catch (e) {
+      return { available: false, via: null, reason: e instanceof Error ? e.message : 'Sarvam check failed.' };
+    }
+  },
+
+  /** Live call through Sarvam: queue the CRM call, then hand it to the always-on direct campaign. */
+  async startSarvamCall(db: DB, input: StartOutboundInput & { contactId: string | null }): Promise<StartCallResult> {
+    const admin = createAdminClient();
+    if (!admin) throw new AppError('SUPABASE_SECRET_KEY is required for live calling', 'backend_not_configured');
+    const r = await SarvamCalling.readiness(admin, { voiceAgentId: input.voiceAgentId, phoneNumberId: input.phoneNumberId });
+    if (!r.ok) throw new AppError(`Live calling is not ready: ${r.reason}`, 'live_not_ready');
+    const { data: contact } = input.contactId
+      ? await db.from('contacts').select('full_name, business_name, business_category, city').eq('id', input.contactId).maybeSingle()
+      : { data: null };
+    const { data: call, error } = await db
+      .from('calls')
+      .insert({
+        direction: 'outbound',
+        status: 'queued',
+        phone_e164: input.phoneE164,
+        contact_id: input.contactId,
+        phone_number_id: r.line.id,
+        voice_agent_id: r.agent.id,
+        campaign_id: input.campaignId ?? null,
+        is_simulated: false,
+      })
+      .select('id')
+      .single();
+    if (error) throw error;
+    await CallEventService.record(db, call.id, { type: 'initiated', status: 'queued', source: 'user', payload: { via: 'sarvam' } });
+    try {
+      const campaignId = await SarvamCalling.directCampaign(admin, r);
+      const vars: Record<string, string> = {};
+      if (contact?.full_name) vars.user_name = contact.full_name;
+      if (contact?.business_name) vars.business_name = contact.business_name;
+      if (contact?.business_category) vars.business_category = contact.business_category;
+      if (contact?.city) vars.location = contact.city;
+      const cohorts = await SarvamCalling.streamUsers(admin, campaignId, `CRM call ${call.id.slice(0, 8)}`, [
+        { user_phone_number: input.phoneE164, user_identifier: `call:${call.id}`, app_variables: vars },
+      ]);
+      await CallEventService.record(admin, call.id, {
+        type: 'submitted_to_sarvam',
+        status: 'queued',
+        source: 'system',
+        payload: { sarvam_campaign_id: campaignId, cohort_ids: cohorts, agent: r.agent.appId, agent_version: r.agent.version, from: r.line.phone },
+      });
+      return { callId: call.id, simulated: false, status: 'queued', outcome: null };
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : 'Sarvam error';
+      await db.from('calls').update({ status: 'failed', failure_reason: reason.slice(0, 500) }).eq('id', call.id);
+      await CallEventService.record(db, call.id, { type: 'failed', status: 'failed', source: 'system', payload: { reason } });
+      throw err instanceof AppError ? err : new AppError(`Sarvam rejected the call: ${reason}`, 'provider_error');
+    }
   },
 
   async startOutboundCall(db: DB, input: StartOutboundInput): Promise<StartCallResult> {
@@ -54,7 +114,11 @@ export const TelephonyService = {
 
     // ---- LIVE ----
     const provider = getTelephonyProvider();
-    if (!provider.configured) throw new ProviderNotConfiguredError('Live outbound calling');
+    if (!provider.configured) {
+      const live = await this.liveStatus({ voiceAgentId: input.voiceAgentId, phoneNumberId: input.phoneNumberId });
+      if (live.via === 'sarvam') return this.startSarvamCall(db, { ...input, contactId });
+      throw new ProviderNotConfiguredError('Live outbound calling');
+    }
     const admin = createAdminClient();
     if (!admin) throw new AppError('SUPABASE_SECRET_KEY is required for live calling', 'backend_not_configured');
 

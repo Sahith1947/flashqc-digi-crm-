@@ -27,14 +27,15 @@ export default async function OutboundPage(props: PageProps<'/outbound'>) {
     agentOptions(db),
     getSettings(db),
   ]);
-  const liveAvailable = TelephonyService.isLiveCallingAvailable();
+  const live = await TelephonyService.liveStatus();
+  const liveAvailable = live.available;
   const dialPhone = dial ? normalizePhone(dial) : null;
   return (
     <>
       <PageHeader title="Outbound Calls" description="Place individual calls and review outbound call history." />
       <div className="grid gap-6 xl:grid-cols-3">
         <Card className="xl:col-span-1">
-          <CardHeader title="Place a call" description={liveAvailable ? 'Live calling is connected.' : 'Live calling activates after telephony integration.'} />
+          <CardHeader title="Place a call" description={liveAvailable ? `Live calling is connected${live.via === 'sarvam' ? ' through Sarvam' : ''}.` : `Live calling not ready: ${live.reason}`} />
           <CardBody>
             {hasMinRole(profile.role, 'agent') ? (
               <OutboundDialer

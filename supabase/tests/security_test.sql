@@ -191,6 +191,13 @@ select pg_temp.expect((select provider_status is null and provider_synced_at is 
 insert into public.phone_numbers (label, phone_e164, provider) values ('Vobiz line', '+914099999999', 'vobiz');
 select pg_temp.expect_error($$update public.phone_numbers set provider_synced_at = now() where label = 'Vobiz line'$$, 'manager cannot fake number sync');
 
+-- Sarvam campaign link is backend-only
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000b');
+insert into public.campaigns (name, mode, provider, provider_campaign_id) values ('Sneaky live', 'live', 'sarvam', 'fake-id');
+select pg_temp.expect((select provider_campaign_id is null and provider is null from public.campaigns where name = 'Sneaky live'), 'insert cannot claim a Sarvam campaign link');
+select pg_temp.expect_error($$update public.campaigns set provider_campaign_id = 'x' where name = 'Sneaky live'$$, 'manager cannot set Sarvam campaign link');
+select pg_temp.expect_error($$update public.voice_agents set provider_committed_version = 9 where name = 'Synced Agent'$$, 'manager cannot fake published agent version');
+
 -- ---------------------------------------------------------------------------
 -- Admin: integrations config (not status), audit log
 -- ---------------------------------------------------------------------------

@@ -130,3 +130,14 @@ export async function syncSarvamNumbers(): Promise<ActionResult> {
     };
   });
 }
+
+export async function enableSarvamCallSync(): Promise<ActionResult> {
+  return runAction(async () => {
+    await assertRole('admin');
+    const admin = backend();
+    const { SarvamCalling } = await import('@/server/providers/sarvam/calling');
+    const r = await SarvamCalling.enableInboundSync(admin);
+    refreshSarvamPages();
+    return { ok: true, message: `Inbound call sync enabled for: ${r.deployments.join(', ')}. Calls to your Sarvam number will now appear in the CRM.` };
+  });
+}

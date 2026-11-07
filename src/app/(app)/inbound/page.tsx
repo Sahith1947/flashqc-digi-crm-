@@ -52,7 +52,7 @@ export default async function InboundPage(props: PageProps<'/inbound'>) {
       return !a || a < m.started_at!;
     });
   }
-  const liveAvailable = TelephonyService.isLiveCallingAvailable();
+  const liveAvailable = (await TelephonyService.liveStatus()).available;
 
   return (
     <>

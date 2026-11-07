@@ -14,14 +14,15 @@ import { CheckButton, IntegrationNotesForm } from '@/components/config/integrati
 import { ActionButton, SarvamConnect } from '@/components/config/sarvam-connect';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { SarvamAuth } from '@/server/providers/sarvam/auth';
-import { syncSarvamAgents, syncSarvamNumbers } from './actions';
+import { enableSarvamCallSync, syncSarvamAgents, syncSarvamNumbers } from './actions';
+import { TelephonyService } from '@/server/services/telephony-service';
 
 export const metadata: Metadata = { title: 'Integrations' };
 
 const STATUS_TONE = { not_configured: 'neutral', configured: 'warning', connected: 'good', error: 'critical' } as const;
 const STATUS_LABEL = { not_configured: 'Not configured', configured: 'Configured', connected: 'Connected', error: 'Error' } as const;
 
-const CAPABILITIES: Record<string, { label: string; ready: keyof ReturnType<typeof integrationReadiness> | 'storage' | 'sarvam' }[]> = {
+const CAPABILITIES: Record<string, { label: string; ready: keyof ReturnType<typeof integrationReadiness> | 'storage' | 'sarvam' | 'live' | 'inbound' | 'recordings' }[]> = {
   sarvam_ai: [
     { label: 'Voice agent sync (Sarvam → CRM)', ready: 'sarvam' },
     { label: 'Telephony number sync', ready: 'sarvam' },
@@ -29,9 +30,9 @@ const CAPABILITIES: Record<string, { label: string; ready: keyof ReturnType<type
     { label: 'AI call summaries', ready: 'summaries' },
   ],
   telephony: [
-    { label: 'Live outbound calls', ready: 'telephony' },
-    { label: 'Inbound call webhooks', ready: 'telephony' },
-    { label: 'Provider-hosted recordings', ready: 'providerRecordings' },
+    { label: 'Live outbound calls & campaigns', ready: 'live' },
+    { label: 'Inbound call sync', ready: 'inbound' },
+    { label: 'Call recordings, transcripts & AI summaries', ready: 'recordings' },
   ],
   recording_storage: [{ label: 'Private recording uploads & signed playback', ready: 'storage' }],
 };
@@ -51,6 +52,10 @@ export default async function IntegrationsPage() {
   const canManage = hasMinRole(profile.role, 'manager');
   const admin = createAdminClient();
   const sarvam = admin && env.INTEGRATION_ENCRYPTION_KEY ? await SarvamAuth.status(admin) : null;
+  const live = await TelephonyService.liveStatus();
+  const { data: appSettings } = await db.from('app_settings').select('sarvam_inbound_webhook_at').maybeSingle();
+  const inboundSync = Boolean(appSettings?.sarvam_inbound_webhook_at);
+  const flags = { live: live.available, inbound: inboundSync, recordings: live.available || inboundSync };
   const h = await headers();
   const origin = `${h.get('x-forwarded-proto') ?? 'http'}://${h.get('host') ?? 'localhost:3000'}`;
 
@@ -89,7 +94,7 @@ export default async function IntegrationsPage() {
                 <p className="mb-2 text-xs font-semibold tracking-wide text-ink-3 uppercase">Capabilities</p>
                 <ul className="space-y-1.5 text-sm">
                   {CAPABILITIES[i.key].map((c) => {
-                    const ok = c.ready === 'storage' ? i.status === 'connected' : c.ready === 'sarvam' ? Boolean(sarvam?.connected) : ready[c.ready];
+                    const ok = c.ready === 'storage' ? i.status === 'connected' : c.ready === 'sarvam' ? Boolean(sarvam?.connected) : c.ready === 'live' || c.ready === 'inbound' || c.ready === 'recordings' ? flags[c.ready] : ready[c.ready];
                     return (
                       <li key={c.label} className="flex items-center gap-2">
                         {ok ? <CheckCircle2 className="size-4 text-green-700" /> : <CircleDashed className="size-4 text-ink-3" />}
@@ -114,11 +119,21 @@ export default async function IntegrationsPage() {
                   ))}
                 </ul>
               </div>
+              {i.key === 'telephony' && sarvam?.connected && (
+                <div className="space-y-2" data-testid="telephony-live">
+                  {!live.available && <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">Live calling: {live.reason}</p>}
+                  {live.available && <p className="rounded-lg bg-green-50 px-3 py-2 text-xs text-green-900">Live calls and live campaigns dial through Sarvam from your synced number.</p>}
+                  {isAdmin && (
+                    <ActionButton action={enableSarvamCallSync} label={inboundSync ? 'Re-apply inbound call sync' : 'Enable inbound call sync'} testId="enable-inbound-sync" variant={inboundSync ? 'secondary' : 'primary'} />
+                  )}
+                  {inboundSync && <p className="text-xs text-ink-3">Inbound calls are sent to the CRM since {formatDateTime(appSettings!.sarvam_inbound_webhook_at)}.</p>}
+                </div>
+              )}
               {i.key === 'telephony' && (
                 <div>
                   <p className="mb-1 text-xs font-semibold tracking-wide text-ink-3 uppercase">Webhook URL</p>
-                  <code className="block rounded-lg bg-canvas px-3 py-2 font-mono text-xs break-all">{origin}/api/webhooks/telephony/&lt;provider&gt;</code>
-                  <p className="mt-1 text-xs text-ink-3">Rejects all requests until a provider adapter with signature verification is registered.</p>
+                  <code className="block rounded-lg bg-canvas px-3 py-2 font-mono text-xs break-all">{origin}/api/webhooks/telephony/sarvam</code>
+                  <p className="mt-1 text-xs text-ink-3">Accepts only deliveries that carry the CRM&apos;s secret, which the CRM gives Sarvam when it sets up calls.</p>
                 </div>
               )}
               {isAdmin && (

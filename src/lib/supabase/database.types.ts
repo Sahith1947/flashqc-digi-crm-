@@ -25,14 +25,14 @@ export type Database = {
           Tables: {
             "app_settings": {
                   Row: {
-                    "admin_emails": (string)[],"company_name": string,"default_calling_window_end": string,"default_calling_window_start": string,"id": boolean,"simulation_mode_enabled": boolean,"updated_at": string
+                    "admin_emails": (string)[],"company_name": string,"default_calling_window_end": string,"default_calling_window_start": string,"id": boolean,"sarvam_direct_campaign_id": string | null,"sarvam_direct_campaign_key": string | null,"sarvam_inbound_webhook_at": string | null,"simulation_mode_enabled": boolean,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "admin_emails"?: (string)[],"company_name"?: string,"default_calling_window_end"?: string,"default_calling_window_start"?: string,"id"?: boolean,"simulation_mode_enabled"?: boolean,"updated_at"?: string
+                    "admin_emails"?: (string)[],"company_name"?: string,"default_calling_window_end"?: string,"default_calling_window_start"?: string,"id"?: boolean,"sarvam_direct_campaign_id"?: string | null,"sarvam_direct_campaign_key"?: string | null,"sarvam_inbound_webhook_at"?: string | null,"simulation_mode_enabled"?: boolean,"updated_at"?: string
                   }
                   Update: {
-                    "admin_emails"?: (string)[],"company_name"?: string,"default_calling_window_end"?: string,"default_calling_window_start"?: string,"id"?: boolean,"simulation_mode_enabled"?: boolean,"updated_at"?: string
+                    "admin_emails"?: (string)[],"company_name"?: string,"default_calling_window_end"?: string,"default_calling_window_start"?: string,"id"?: boolean,"sarvam_direct_campaign_id"?: string | null,"sarvam_direct_campaign_key"?: string | null,"sarvam_inbound_webhook_at"?: string | null,"simulation_mode_enabled"?: boolean,"updated_at"?: string
                   }
                   Relationships: [
                     
@@ -85,14 +85,14 @@ isOneToOne: false
                   ]
                 },"call_recordings": {
                   Row: {
-                    "call_id": string,"created_at": string,"duration_seconds": number | null,"id": string,"mime_type": string | null,"provider_recording_id": string | null,"size_bytes": number | null,"source": string,"storage_bucket": string | null,"storage_path": string | null,"uploaded_by": string | null
+                    "call_id": string,"created_at": string,"duration_seconds": number | null,"id": string,"mime_type": string | null,"provider_recording_id": string | null,"provider_recording_url": string | null,"size_bytes": number | null,"source": string,"storage_bucket": string | null,"storage_path": string | null,"uploaded_by": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "call_id": string,"created_at"?: string,"duration_seconds"?: number | null,"id"?: string,"mime_type"?: string | null,"provider_recording_id"?: string | null,"size_bytes"?: number | null,"source": string,"storage_bucket"?: string | null,"storage_path"?: string | null,"uploaded_by"?: string | null
+                    "call_id": string,"created_at"?: string,"duration_seconds"?: number | null,"id"?: string,"mime_type"?: string | null,"provider_recording_id"?: string | null,"provider_recording_url"?: string | null,"size_bytes"?: number | null,"source": string,"storage_bucket"?: string | null,"storage_path"?: string | null,"uploaded_by"?: string | null
                   }
                   Update: {
-                    "call_id"?: string,"created_at"?: string,"duration_seconds"?: number | null,"id"?: string,"mime_type"?: string | null,"provider_recording_id"?: string | null,"size_bytes"?: number | null,"source"?: string,"storage_bucket"?: string | null,"storage_path"?: string | null,"uploaded_by"?: string | null
+                    "call_id"?: string,"created_at"?: string,"duration_seconds"?: number | null,"id"?: string,"mime_type"?: string | null,"provider_recording_id"?: string | null,"provider_recording_url"?: string | null,"size_bytes"?: number | null,"source"?: string,"storage_bucket"?: string | null,"storage_path"?: string | null,"uploaded_by"?: string | null
                   }
                   Relationships: [
                     {
@@ -287,14 +287,14 @@ isOneToOne: false
                   ]
                 },"campaigns": {
                   Row: {
-                    "calling_window_end": string,"calling_window_start": string,"completed_at": string | null,"created_at": string,"created_by": string | null,"description": string | null,"id": string,"max_attempts": number,"mode": string,"name": string,"paused_at": string | null,"phone_number_id": string | null,"started_at": string | null,"status": string,"updated_at": string,"voice_agent_id": string | null
+                    "calling_window_end": string,"calling_window_start": string,"completed_at": string | null,"created_at": string,"created_by": string | null,"description": string | null,"id": string,"max_attempts": number,"mode": string,"name": string,"paused_at": string | null,"phone_number_id": string | null,"provider": string | null,"provider_campaign_id": string | null,"provider_synced_at": string | null,"started_at": string | null,"status": string,"updated_at": string,"voice_agent_id": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "calling_window_end"?: string,"calling_window_start"?: string,"completed_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"description"?: string | null,"id"?: string,"max_attempts"?: number,"mode"?: string,"name": string,"paused_at"?: string | null,"phone_number_id"?: string | null,"started_at"?: string | null,"status"?: string,"updated_at"?: string,"voice_agent_id"?: string | null
+                    "calling_window_end"?: string,"calling_window_start"?: string,"completed_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"description"?: string | null,"id"?: string,"max_attempts"?: number,"mode"?: string,"name": string,"paused_at"?: string | null,"phone_number_id"?: string | null,"provider"?: string | null,"provider_campaign_id"?: string | null,"provider_synced_at"?: string | null,"started_at"?: string | null,"status"?: string,"updated_at"?: string,"voice_agent_id"?: string | null
                   }
                   Update: {
-                    "calling_window_end"?: string,"calling_window_start"?: string,"completed_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"description"?: string | null,"id"?: string,"max_attempts"?: number,"mode"?: string,"name"?: string,"paused_at"?: string | null,"phone_number_id"?: string | null,"started_at"?: string | null,"status"?: string,"updated_at"?: string,"voice_agent_id"?: string | null
+                    "calling_window_end"?: string,"calling_window_start"?: string,"completed_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"description"?: string | null,"id"?: string,"max_attempts"?: number,"mode"?: string,"name"?: string,"paused_at"?: string | null,"phone_number_id"?: string | null,"provider"?: string | null,"provider_campaign_id"?: string | null,"provider_synced_at"?: string | null,"started_at"?: string | null,"status"?: string,"updated_at"?: string,"voice_agent_id"?: string | null
                   }
                   Relationships: [
                     {
@@ -427,14 +427,14 @@ isOneToOne: false
                   ]
                 },"voice_agents": {
                   Row: {
-                    "connection_status": string,"created_at": string,"created_by": string | null,"description": string | null,"greeting": string | null,"id": string,"instructions": string | null,"language": string,"name": string,"provider": string,"provider_agent_id": string | null,"provider_deployed": boolean | null,"provider_status": string | null,"provider_synced_at": string | null,"provider_version": number | null,"status": string,"updated_at": string,"voice": string | null
+                    "connection_status": string,"created_at": string,"created_by": string | null,"description": string | null,"greeting": string | null,"id": string,"instructions": string | null,"language": string,"name": string,"provider": string,"provider_agent_id": string | null,"provider_committed_version": number | null,"provider_deployed": boolean | null,"provider_status": string | null,"provider_synced_at": string | null,"provider_version": number | null,"status": string,"updated_at": string,"voice": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "connection_status"?: string,"created_at"?: string,"created_by"?: string | null,"description"?: string | null,"greeting"?: string | null,"id"?: string,"instructions"?: string | null,"language"?: string,"name": string,"provider"?: string,"provider_agent_id"?: string | null,"provider_deployed"?: boolean | null,"provider_status"?: string | null,"provider_synced_at"?: string | null,"provider_version"?: number | null,"status"?: string,"updated_at"?: string,"voice"?: string | null
+                    "connection_status"?: string,"created_at"?: string,"created_by"?: string | null,"description"?: string | null,"greeting"?: string | null,"id"?: string,"instructions"?: string | null,"language"?: string,"name": string,"provider"?: string,"provider_agent_id"?: string | null,"provider_committed_version"?: number | null,"provider_deployed"?: boolean | null,"provider_status"?: string | null,"provider_synced_at"?: string | null,"provider_version"?: number | null,"status"?: string,"updated_at"?: string,"voice"?: string | null
                   }
                   Update: {
-                    "connection_status"?: string,"created_at"?: string,"created_by"?: string | null,"description"?: string | null,"greeting"?: string | null,"id"?: string,"instructions"?: string | null,"language"?: string,"name"?: string,"provider"?: string,"provider_agent_id"?: string | null,"provider_deployed"?: boolean | null,"provider_status"?: string | null,"provider_synced_at"?: string | null,"provider_version"?: number | null,"status"?: string,"updated_at"?: string,"voice"?: string | null
+                    "connection_status"?: string,"created_at"?: string,"created_by"?: string | null,"description"?: string | null,"greeting"?: string | null,"id"?: string,"instructions"?: string | null,"language"?: string,"name"?: string,"provider"?: string,"provider_agent_id"?: string | null,"provider_committed_version"?: number | null,"provider_deployed"?: boolean | null,"provider_status"?: string | null,"provider_synced_at"?: string | null,"provider_version"?: number | null,"status"?: string,"updated_at"?: string,"voice"?: string | null
                   }
                   Relationships: [
                     {
@@ -522,7 +522,7 @@ isOneToOne: false
                   ]
                 },"recording_library_view": {
                   Row: {
-                    "business_name": string | null,"call_id": string,"call_number": number,"call_started_at": string,"call_status": string,"campaign_id": string | null,"campaign_name": string | null,"contact_id": string | null,"contact_name": string | null,"created_at": string,"direction": string,"duration_seconds": number | null,"has_summary": boolean | null,"has_transcript": boolean | null,"id": string,"is_simulated": boolean,"mime_type": string | null,"phone_e164": string,"provider_recording_id": string | null,"size_bytes": number | null,"source": string,"storage_bucket": string | null,"storage_path": string | null
+                    "business_name": string | null,"call_id": string,"call_number": number,"call_started_at": string,"call_status": string,"campaign_id": string | null,"campaign_name": string | null,"contact_id": string | null,"contact_name": string | null,"created_at": string,"direction": string,"duration_seconds": number | null,"has_summary": boolean | null,"has_transcript": boolean | null,"id": string,"is_simulated": boolean,"mime_type": string | null,"phone_e164": string,"provider_recording_id": string | null,"provider_recording_url": string | null,"size_bytes": number | null,"source": string,"storage_bucket": string | null,"storage_path": string | null
                   }
                   ComputedFields: never
                   Relationships: [

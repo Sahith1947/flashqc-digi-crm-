@@ -911,9 +911,11 @@ function contactsCsv() {
   });
 
   // ------------------------------------------------------------------ API ENDPOINTS
-  await step('Webhook rejects unconfigured provider', async () => {
-    const r = await anon.page.request.post(`${BASE}/api/webhooks/telephony/sarvam`, { data: { fake: true } });
-    assert(r.status() === 404, `status ${r.status()}`);
+  await step('Webhooks: Sarvam rejects requests without the secret; unknown providers 404', async () => {
+    const r = await anon.page.request.post(`${BASE}/api/webhooks/telephony/sarvam`, { data: { deployment_id: 'x', app_id: 'y', interaction_id: 'z', user_phone_number: '+919800000000', agent_phone_number: '+919800000001' } });
+    assert(r.status() === 401, `sarvam without secret: ${r.status()}`);
+    const r2 = await anon.page.request.post(`${BASE}/api/webhooks/telephony/acme`, { data: {} });
+    assert(r2.status() === 404, `unknown provider: ${r2.status()}`);
   });
   await step('Cron endpoint requires secret; processes with secret', async () => {
     const r1 = await anon.page.request.post(`${BASE}/api/cron/campaigns`);

@@ -22,7 +22,7 @@ export default async function NewCampaignPage() {
       <CampaignWizard
         lines={lines}
         agents={agents}
-        liveAvailable={TelephonyService.isLiveCallingAvailable()}
+        liveAvailable={(await TelephonyService.liveStatus()).available}
         defaults={{ start: settings?.default_calling_window_start ?? '09:00', end: settings?.default_calling_window_end ?? '21:00' }}
         facets={facets}
       />

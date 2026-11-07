@@ -14,6 +14,8 @@ export const serverEnv = {
   /** Fallback secret to derive the encryption key from when INTEGRATION_ENCRYPTION_KEY is not set (hosted deploys). */
   supabaseJwtSecret: process.env.SUPABASE_JWT_SECRET ?? '',
   /** Sarvam voice-agents MCP endpoint. */
+  /** Public base URL of this app (for provider webhooks). Vercel sets VERCEL_PROJECT_PRODUCTION_URL automatically. */
+  publicBaseUrl: (process.env.APP_URL || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : '')).replace(/\/$/, ''),
   sarvamMcpUrl: (process.env.SARVAM_MCP_URL ?? 'https://mcp.sarvam.ai/voice-agents').replace(/\/$/, ''),
 };
 

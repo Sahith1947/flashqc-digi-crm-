@@ -63,7 +63,7 @@ export default async function CampaignDetailPage(props: PageProps<'/campaigns/[i
   const editable = campaign.status === 'draft' || campaign.status === 'paused';
   const line = campaign.phone_numbers as { label: string; phone_e164: string } | null;
   const agent = campaign.voice_agents as { name: string } | null;
-  const liveAvailable = TelephonyService.isLiveCallingAvailable();
+  const liveAvailable = (await TelephonyService.liveStatus()).available;
 
   return (
     <>
