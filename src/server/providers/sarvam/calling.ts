@@ -213,6 +213,12 @@ export const SarvamCalling = {
     return id;
   },
 
+  /** Publishes (commits) an agent's current draft in Sarvam, so deployments and campaigns may use it. */
+  async publishAgentDraft(admin: DB, appId: string): Promise<void> {
+    const c = await client(admin);
+    await c.callTool('agents', { operation: 'commit', id: appId, params: { app_version_description: 'Published from FlashQC Digi CRM' } });
+  },
+
   /** Points Sarvam's inbound deployments for the CRM's numbers at the CRM webhook. */
   async enableInboundSync(admin: DB): Promise<{ deployments: string[] }> {
     const baseUrl = serverEnv.publicBaseUrl;
