@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
-// Return point for Google sign-in and email links (PKCE code exchange).
+// Return point for email confirmation / magic links (PKCE code exchange).
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl;
   const rawNext = searchParams.get('next') ?? '/';

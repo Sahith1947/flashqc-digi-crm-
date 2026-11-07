@@ -55,7 +55,7 @@ export function OrgSettingsForm({ s, canEdit }: { s: { company_name: string; def
         label="Auto-approved admin emails"
         htmlFor="os_admins"
         error={fe?.admin_emails ?? fe?.['admin_emails.0']}
-        hint="These people become active admins the first time they sign in (Google or email). One per line. Everyone else waits for approval."
+        hint="These people become active admins the first time they create their account. One per line. Everyone else waits for approval."
       >
         <Textarea id="os_admins" name="admin_emails" rows={3} defaultValue={s.admin_emails.join('\n')} disabled={!canEdit} placeholder="name@gmail.com" />
       </Field>

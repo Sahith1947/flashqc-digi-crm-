@@ -182,13 +182,9 @@ function contactsCsv() {
     await anon.page.getByText('Invalid email or password.').waitFor();
   });
 
-  await step('Google button: clear message while Google is not enabled in Supabase', async () => {
+  await step('No Google sign-in button (email + password only)', async () => {
     await goto(anon.page, '/login');
-    await anon.page.getByTestId('google-signin').click();
-    await anon.page.waitForURL(/error=google_disabled/);
-    await anon.page.getByText('Google sign-in is not switched on yet').waitFor();
-    await goto(anon.page, '/signup');
-    assert((await anon.page.getByTestId('google-signin').count()) === 1, 'no Google button on signup');
+    assert((await anon.page.getByText('Continue with Google').count()) === 0, 'Google button still present');
   });
   await step('Admin approves agent (role agent) and viewer via Team tab', async () => {
     await goto(admin.page, '/settings?tab=team');
