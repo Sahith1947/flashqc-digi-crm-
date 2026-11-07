@@ -84,7 +84,10 @@ export class SarvamMcpClient {
       console.error(`[sarvam] ${name} error:`, text.slice(0, 2000));
       const status = /\((\d{3})\)\s*([A-Za-z ]{3,40})/.exec(text);
       const code = /"code":\s*"([a-z_]+)"/.exec(text)?.[1];
-      const reason = status ? `${status[2].trim().toLowerCase()} (HTTP ${status[1]})` : code ? code.replace(/_/g, ' ') : 'request refused';
+      // Sarvam's validation explanation (e.g. "name: String should match pattern ..."), when present.
+      const details = /'details':\s*\\?"(.*?)\\?"\s*\}/.exec(text)?.[1] ?? /'details':\s*'(.*?)'\s*\}/.exec(text)?.[1];
+      const base = status ? `${status[2].trim().toLowerCase()} (HTTP ${status[1]})` : code ? code.replace(/_/g, ' ') : 'request refused';
+      const reason = details ? `${base} — ${details.replace(/\\+/g, '').replace(/^[:\s]+/, '').slice(0, 240)}` : base;
       throw new AppError(`Sarvam refused ${name.replace(/_/g, ' ')}: ${reason}.`, 'sarvam_tool', text.slice(0, 4000));
     }
     try {

@@ -14,8 +14,7 @@ import { CheckButton, IntegrationNotesForm } from '@/components/config/integrati
 import { ActionButton, SarvamConnect } from '@/components/config/sarvam-connect';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { SarvamAuth } from '@/server/providers/sarvam/auth';
-import { enableSarvamCallSync, publishDraftAndEnableInbound, syncSarvamAgents, syncSarvamNumbers } from './actions';
-import { ConfirmAction } from '@/components/ui/confirm-action';
+import { enableSarvamCallSync, syncSarvamAgents, syncSarvamNumbers } from './actions';
 import { TelephonyService } from '@/server/services/telephony-service';
 
 export const metadata: Metadata = { title: 'Integrations' };
@@ -57,12 +56,6 @@ export default async function IntegrationsPage() {
   const { data: appSettings } = await db.from('app_settings').select('sarvam_inbound_webhook_at').maybeSingle();
   const inboundSync = Boolean(appSettings?.sarvam_inbound_webhook_at);
   const flags = { live: live.available, inbound: inboundSync, recordings: live.available || inboundSync };
-  const { data: draftAgents } = await db
-    .from('voice_agents')
-    .select('id, name, provider_version, provider_committed_version')
-    .eq('provider', 'sarvam')
-    .not('provider_synced_at', 'is', null);
-  const draftAgent = (draftAgents ?? []).find((a) => a.provider_version != null && (a.provider_committed_version ?? 0) < a.provider_version);
   const h = await headers();
   const origin = `${h.get('x-forwarded-proto') ?? 'http'}://${h.get('host') ?? 'localhost:3000'}`;
 
@@ -130,22 +123,6 @@ export default async function IntegrationsPage() {
                 <div className="space-y-2" data-testid="telephony-live">
                   {!live.available && <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">Live calling: {live.reason}</p>}
                   {live.available && <p className="rounded-lg bg-green-50 px-3 py-2 text-xs text-green-900">Live calls and live campaigns dial through Sarvam from your synced number.</p>}
-                  {isAdmin && !inboundSync && draftAgent && (
-                    <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900" data-testid="draft-agent-notice">
-                      <p>
-                        &quot;{draftAgent.name}&quot; answers inbound calls with <strong>draft version {draftAgent.provider_version}</strong>; the latest published version is {draftAgent.provider_committed_version ?? 'none'}. Sarvam only connects inbound sync to a published version.
-                      </p>
-                      <ConfirmAction
-                        action={publishDraftAndEnableInbound.bind(null, draftAgent.id)}
-                        label={`Publish v${draftAgent.provider_version} & enable inbound sync`}
-                        variant="primary"
-                        title={`Publish version ${draftAgent.provider_version} in Sarvam?`}
-                        description={`This freezes the current draft of "${draftAgent.name}" as published version ${draftAgent.provider_version} in your Sarvam account (Sarvam keeps a new draft for future edits). New live campaigns will use this version. Then the CRM connects your inbound line so calls appear in Call Logs.`}
-                        confirmLabel="Publish and enable"
-                        testId="publish-draft"
-                      />
-                    </div>
-                  )}
                   {isAdmin && (
                     <ActionButton action={enableSarvamCallSync} label={inboundSync ? 'Re-apply inbound call sync' : 'Enable inbound call sync'} testId="enable-inbound-sync" variant={inboundSync ? 'secondary' : 'primary'} />
                   )}

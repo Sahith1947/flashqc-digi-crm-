@@ -142,29 +142,3 @@ export async function enableSarvamCallSync(): Promise<ActionResult> {
   });
 }
 
-/** Publishes the agent's draft in Sarvam, re-syncs agents, then enables inbound call sync. */
-export async function publishDraftAndEnableInbound(voiceAgentId: string): Promise<ActionResult> {
-  return runAction(async () => {
-    await assertRole('admin');
-    const admin = backend();
-    const { data: agent } = await admin
-      .from('voice_agents')
-      .select('name, provider_agent_id, provider_version, provider_committed_version')
-      .eq('id', z.string().uuid().parse(voiceAgentId))
-      .eq('provider', 'sarvam')
-      .maybeSingle();
-    if (!agent?.provider_agent_id) return { ok: false, error: 'That agent is not a synced Sarvam agent.' };
-    if (agent.provider_version != null && agent.provider_committed_version != null && agent.provider_version <= agent.provider_committed_version) {
-      return { ok: false, error: 'This agent has no unpublished draft. Sync agents and try again.' };
-    }
-    const { SarvamCalling } = await import('@/server/providers/sarvam/calling');
-    await SarvamCalling.publishAgentDraft(admin, agent.provider_agent_id);
-    await SarvamService.syncAgents(admin);
-    const r = await SarvamCalling.enableInboundSync(admin);
-    refreshSarvamPages();
-    return {
-      ok: true,
-      message: `Published version ${agent.provider_version} of "${agent.name}" in Sarvam and enabled inbound call sync for: ${r.deployments.join(', ')}.`,
-    };
-  });
-}

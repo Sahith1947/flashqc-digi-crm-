@@ -233,16 +233,12 @@ export const SarvamCalling = {
       try {
         await c.callTool('configure_deployment', { deployment_id: d.deployment_id, webhook_config: this.webhookConfig(baseUrl, { crm_kind: 'inbound' }) });
       } catch (e) {
-        const { data: agent } = await admin
-          .from('voice_agents')
-          .select('name, provider_committed_version')
-          .eq('provider', 'sarvam')
-          .eq('provider_agent_id', d.app_id ?? '')
-          .maybeSingle();
-        const published = agent?.provider_committed_version ?? null;
-        if (d.app_version && published !== null && d.app_version > published) {
+        // Only blame a draft version when Sarvam's own version list says so.
+        const info = await c.callTool<{ versions?: { app_version: number; status: string }[] }>('agents', { operation: 'get', id: d.app_id ?? '', params: { include: ['versions'] } }).catch(() => null);
+        const committed = new Set((info?.versions ?? []).filter((v) => v.status === 'committed').map((v) => v.app_version));
+        if (info && d.app_version && !committed.has(d.app_version)) {
           throw new AppError(
-            `Sarvam would not update the inbound deployment "${d.name}". It answers calls with draft version ${d.app_version} of "${agent?.name ?? 'your agent'}", but the latest published version is ${published}. In Sarvam, publish the agent (so version ${d.app_version} is committed) or move the deployment to a published version, then click "Enable inbound call sync" again.`,
+            `Sarvam would not update the inbound deployment "${d.name}": it answers with draft version ${d.app_version}. Publish that version in Sarvam, then click "Enable inbound call sync" again.`,
             'sarvam_deployment_draft',
           );
         }
