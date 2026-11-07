@@ -67,7 +67,7 @@ async function login(page, email) {
   await page.goto(`${BASE}/login`);
   await page.fill('#email', email);
   await page.fill('#password', PASSWORD);
-  await Promise.all([page.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 20000 }), page.click('button[type=submit]')]);
+  await Promise.all([page.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 20000 }), page.click('[data-testid=auth-submit]')]);
 }
 
 async function toast(page, kind, re) {
@@ -137,7 +137,7 @@ function contactsCsv() {
     await anon.page.fill('#full_name', 'A');
     await anon.page.fill('#email', 'not-an-email');
     await anon.page.fill('#password', 'short');
-    await anon.page.click('button[type=submit]');
+    await anon.page.click('[data-testid=auth-submit]');
     await anon.page.getByText('Enter a valid email address').waitFor();
     await anon.page.getByText('Password must be at least 8 characters').waitFor();
   });
@@ -148,7 +148,7 @@ function contactsCsv() {
     await admin.page.fill('#full_name', 'Sahith Admin');
     await admin.page.fill('#email', 'admin@flashqc.test');
     await admin.page.fill('#password', PASSWORD);
-    await Promise.all([admin.page.waitForURL(`${BASE}/`), admin.page.click('button[type=submit]')]);
+    await Promise.all([admin.page.waitForURL(`${BASE}/`), admin.page.click('[data-testid=auth-submit]')]);
     await admin.page.waitForSelector('[data-testid=metric-cards]');
     assert(sql("select role||':'||is_active from profiles where email='admin@flashqc.test'") === 'admin:true', 'not admin');
   });
@@ -159,7 +159,7 @@ function contactsCsv() {
     await agent.page.fill('#full_name', 'Ravi Agent');
     await agent.page.fill('#email', 'agent@flashqc.test');
     await agent.page.fill('#password', PASSWORD);
-    await agent.page.click('button[type=submit]');
+    await agent.page.click('[data-testid=auth-submit]');
     await agent.page.waitForURL((u) => u.pathname !== '/signup', { timeout: 20000 });
     await goto(agent.page, '/contacts');
     await agent.page.waitForURL((u) => u.pathname === '/pending');
@@ -171,17 +171,25 @@ function contactsCsv() {
     await viewer.page.fill('#full_name', 'Vani Viewer');
     await viewer.page.fill('#email', 'viewer@flashqc.test');
     await viewer.page.fill('#password', PASSWORD);
-    await viewer.page.click('button[type=submit]');
+    await viewer.page.click('[data-testid=auth-submit]');
     await viewer.page.waitForURL((u) => u.pathname !== '/signup', { timeout: 20000 });
   });
   await step('Wrong password shows error, not success', async () => {
     await goto(anon.page, '/login');
     await anon.page.fill('#email', 'admin@flashqc.test');
     await anon.page.fill('#password', 'WrongPass123');
-    await anon.page.click('button[type=submit]');
+    await anon.page.click('[data-testid=auth-submit]');
     await anon.page.getByText('Invalid email or password.').waitFor();
   });
 
+  await step('Google button: clear message while Google is not enabled in Supabase', async () => {
+    await goto(anon.page, '/login');
+    await anon.page.getByTestId('google-signin').click();
+    await anon.page.waitForURL(/error=google_disabled/);
+    await anon.page.getByText('Google sign-in is not switched on yet').waitFor();
+    await goto(anon.page, '/signup');
+    assert((await anon.page.getByTestId('google-signin').count()) === 1, 'no Google button on signup');
+  });
   await step('Admin approves agent (role agent) and viewer via Team tab', async () => {
     await goto(admin.page, '/settings?tab=team');
     const agentId = sql("select id from profiles where email='agent@flashqc.test'");
@@ -812,6 +820,17 @@ function contactsCsv() {
     await admin.page.getByLabel('Enable simulation mode').check();
     await admin.page.getByRole('button', { name: 'Save settings' }).click();
     await toast(admin.page, 'success', /settings saved/);
+  });
+  await step('Settings: auto-approved admin emails validate and save', async () => {
+    await goto(admin.page, '/settings?tab=organization');
+    assert((await admin.page.inputValue('#os_admins')).includes('bokkisamsahith@gmail.com'), 'default admin email missing');
+    await admin.page.fill('#os_admins', 'bokkisamsahith@gmail.com\nnot-an-email');
+    await admin.page.getByRole('button', { name: 'Save settings' }).click();
+    await toast(admin.page, 'error', /highlighted|valid email/);
+    await admin.page.fill('#os_admins', 'BokkisamSahith@gmail.com, partner@flashqc.in');
+    await admin.page.getByRole('button', { name: 'Save settings' }).click();
+    await toast(admin.page, 'success', /settings saved/);
+    assert(sql('select admin_emails from app_settings') === '{bokkisamsahith@gmail.com,partner@flashqc.in}', sql('select admin_emails from app_settings'));
   });
   await step('Settings: profile name update reflects in sidebar', async () => {
     await goto(admin.page, '/settings');

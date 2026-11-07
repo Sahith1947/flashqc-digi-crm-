@@ -4,6 +4,7 @@ import { headers } from 'next/headers';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { assertPublicEnv } from '@/lib/env';
 import type { ActionResult } from '@/lib/action-result';
 
 const credentials = z.object({
@@ -76,4 +77,24 @@ export async function signOut() {
   const db = await createClient();
   await db.auth.signOut();
   redirect('/login');
+}
+
+/** Starts "Continue with Google" (Supabase OAuth with PKCE). */
+export async function signInWithGoogle(fd: FormData) {
+  const next = safeNext(fd.get('next'));
+  const h = await headers();
+  const origin = h.get('origin') ?? `${h.get('x-forwarded-proto') ?? 'https'}://${h.get('host')}`;
+  const { supabaseUrl, supabaseKey } = assertPublicEnv();
+  // Fail clearly if Google is not enabled in Supabase, instead of sending the user to a raw error page.
+  const settings = (await fetch(`${supabaseUrl}/auth/v1/settings`, { headers: { apikey: supabaseKey }, cache: 'no-store' })
+    .then((r) => r.json())
+    .catch(() => null)) as { external?: { google?: boolean } } | null;
+  if (!settings?.external?.google) redirect('/login?error=google_disabled');
+  const db = await createClient();
+  const { data, error } = await db.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(next)}`, queryParams: { prompt: 'select_account' } },
+  });
+  if (error || !data.url) redirect('/login?error=google_failed');
+  redirect(data.url);
 }

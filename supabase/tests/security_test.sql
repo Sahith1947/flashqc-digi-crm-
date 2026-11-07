@@ -155,6 +155,23 @@ select pg_temp.expect_error($$update public.app_settings set company_name = 'X'$
   'manager cannot change org settings');
 
 -- ---------------------------------------------------------------------------
+-- Auto-approved admin emails (e.g. Google sign-in of a listed Gmail address)
+-- ---------------------------------------------------------------------------
+select pg_temp.as_backend();
+update public.app_settings set admin_emails = array['listed.owner@gmail.com'];
+insert into auth.users (id, email, raw_user_meta_data, aud, role)
+values ('00000000-0000-0000-0000-0000000000f1', 'Listed.Owner@Gmail.com', '{"name":"Listed Owner"}', 'authenticated', 'authenticated'),
+       ('00000000-0000-0000-0000-0000000000f2', 'someone.else@gmail.com', '{"name":"Someone"}', 'authenticated', 'authenticated');
+select pg_temp.expect((select role = 'admin' and is_active and full_name = 'Listed Owner' from public.profiles where id = '00000000-0000-0000-0000-0000000000f1'),
+  'listed email (case-insensitive) becomes active admin with Google name');
+select pg_temp.expect((select role = 'viewer' and not is_active from public.profiles where id = '00000000-0000-0000-0000-0000000000f2'),
+  'unlisted Google user waits for approval');
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000b');
+update public.app_settings set admin_emails = array['attacker@gmail.com'];
+select pg_temp.as_backend();
+select pg_temp.expect((select admin_emails = array['listed.owner@gmail.com'] from public.app_settings), 'manager cannot change admin email list');
+
+-- ---------------------------------------------------------------------------
 -- Sarvam integration: tokens are backend-only; synced fields are backend-only
 -- ---------------------------------------------------------------------------
 select pg_temp.as_backend();

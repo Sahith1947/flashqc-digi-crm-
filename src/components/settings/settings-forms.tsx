@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import type { ActionResult } from '@/lib/action-result';
 import { ROLE_DESCRIPTIONS, ROLE_LABELS, ROLES, SUPPRESSION_SOURCE_LABELS, SUPPRESSION_SOURCES } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
-import { Checkbox, Field, Input, Select } from '@/components/ui/form';
+import { Checkbox, Field, Input, Select, Textarea } from '@/components/ui/form';
 import { useActionToast, useOnSuccess, useToast } from '@/components/ui/toast';
 import { addSuppression, updateMember, updateOrgSettings, updateProfile } from '@/app/(app)/settings/actions';
 
@@ -27,7 +27,7 @@ export function ProfileForm({ name, email }: { name: string; email: string }) {
   );
 }
 
-export function OrgSettingsForm({ s, canEdit }: { s: { company_name: string; default_calling_window_start: string; default_calling_window_end: string; simulation_mode_enabled: boolean }; canEdit: boolean }) {
+export function OrgSettingsForm({ s, canEdit }: { s: { company_name: string; default_calling_window_start: string; default_calling_window_end: string; simulation_mode_enabled: boolean; admin_emails: string[] }; canEdit: boolean }) {
   const { state, pending, onSubmit: action } = useFormAction<ActionResult | null>(updateOrgSettings);
   useActionToast(state);
   const fe = state && !state.ok ? state.fieldErrors : undefined;
@@ -51,6 +51,14 @@ export function OrgSettingsForm({ s, canEdit }: { s: { company_name: string; def
         defaultChecked={s.simulation_mode_enabled}
         disabled={!canEdit}
       />
+      <Field
+        label="Auto-approved admin emails"
+        htmlFor="os_admins"
+        error={fe?.admin_emails ?? fe?.['admin_emails.0']}
+        hint="These people become active admins the first time they sign in (Google or email). One per line. Everyone else waits for approval."
+      >
+        <Textarea id="os_admins" name="admin_emails" rows={3} defaultValue={s.admin_emails.join('\n')} disabled={!canEdit} placeholder="name@gmail.com" />
+      </Field>
       <p className="text-xs text-ink-3">Timezone: dates are displayed in Asia/Kolkata (IST) and stored in UTC.</p>
       {canEdit && (
         <Button type="submit" pending={pending}>

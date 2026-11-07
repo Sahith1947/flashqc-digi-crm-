@@ -28,6 +28,7 @@ export async function updateOrgSettings(_prev: ActionResult | null, fd: FormData
         default_calling_window_start: time,
         default_calling_window_end: time,
         simulation_mode_enabled: z.boolean(),
+        admin_emails: z.array(z.string().email('Each admin email must be a valid email address')).max(20, 'At most 20 admin emails'),
       })
       .refine((d) => d.default_calling_window_start < d.default_calling_window_end, { message: 'Window end must be after start', path: ['default_calling_window_end'] })
       .parse({
@@ -35,6 +36,7 @@ export async function updateOrgSettings(_prev: ActionResult | null, fd: FormData
         default_calling_window_start: formString(fd, 'default_calling_window_start').slice(0, 5),
         default_calling_window_end: formString(fd, 'default_calling_window_end').slice(0, 5),
         simulation_mode_enabled: formBool(fd, 'simulation_mode_enabled'),
+        admin_emails: [...new Set(formString(fd, 'admin_emails').split(/[\s,;]+/).map((e) => e.trim().toLowerCase()).filter(Boolean))],
       });
     const { data: rows, error } = await db.from('app_settings').update(data).eq('id', true).select('id');
     if (error) throw error;

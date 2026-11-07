@@ -34,7 +34,7 @@ export function AuthForm({ mode, next }: { mode: 'login' | 'signup'; next?: stri
           aria-invalid={Boolean(fe?.password)}
         />
       </Field>
-      <Button type="submit" pending={pending} className="w-full">
+      <Button type="submit" pending={pending} className="w-full" data-testid="auth-submit">
         {mode === 'login' ? 'Sign in' : 'Create account'}
       </Button>
       <p className="text-center text-sm text-ink-2">

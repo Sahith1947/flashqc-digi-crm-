@@ -25,14 +25,14 @@ export type Database = {
           Tables: {
             "app_settings": {
                   Row: {
-                    "company_name": string,"default_calling_window_end": string,"default_calling_window_start": string,"id": boolean,"simulation_mode_enabled": boolean,"updated_at": string
+                    "admin_emails": (string)[],"company_name": string,"default_calling_window_end": string,"default_calling_window_start": string,"id": boolean,"simulation_mode_enabled": boolean,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "company_name"?: string,"default_calling_window_end"?: string,"default_calling_window_start"?: string,"id"?: boolean,"simulation_mode_enabled"?: boolean,"updated_at"?: string
+                    "admin_emails"?: (string)[],"company_name"?: string,"default_calling_window_end"?: string,"default_calling_window_start"?: string,"id"?: boolean,"simulation_mode_enabled"?: boolean,"updated_at"?: string
                   }
                   Update: {
-                    "company_name"?: string,"default_calling_window_end"?: string,"default_calling_window_start"?: string,"id"?: boolean,"simulation_mode_enabled"?: boolean,"updated_at"?: string
+                    "admin_emails"?: (string)[],"company_name"?: string,"default_calling_window_end"?: string,"default_calling_window_start"?: string,"id"?: boolean,"simulation_mode_enabled"?: boolean,"updated_at"?: string
                   }
                   Relationships: [
                     
