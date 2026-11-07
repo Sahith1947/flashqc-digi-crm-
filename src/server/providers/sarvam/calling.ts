@@ -165,14 +165,21 @@ export const SarvamCalling = {
 
   /** The always-on campaign used for one-off Live calls, recreated if the agent version or number changes. */
   async directCampaign(admin: DB, r: Extract<Readiness, { ok: true }>): Promise<string> {
-    const key = `${r.agent.appId}@v${r.agent.version}|${r.line.phone}|${r.baseUrl}`;
     const { data: s } = await admin
       .from('app_settings')
       .select('sarvam_direct_campaign_id, sarvam_direct_campaign_key, default_calling_window_start, default_calling_window_end')
       .maybeSingle();
+    const windowStart = s?.default_calling_window_start ?? '09:00';
+    const windowEnd = s?.default_calling_window_end ?? '21:00';
+    // The calling hours are part of the key: changing them in Settings replaces the campaign.
+    const key = `${r.agent.appId}@v${r.agent.version}|${r.line.phone}|${r.baseUrl}|${hhmm(windowStart)}-${hhmm(windowEnd)}`;
     if (s?.sarvam_direct_campaign_id && s.sarvam_direct_campaign_key === key) {
       const status = (await this.campaignStatus(admin, s.sarvam_direct_campaign_id))?.toLowerCase() ?? '';
       if (!/cancel|complete|expired|fail/.test(status)) return s.sarvam_direct_campaign_id;
+    }
+    if (s?.sarvam_direct_campaign_id && s.sarvam_direct_campaign_key !== key) {
+      // Retire the previous one so it can never dial with outdated settings (e.g. wider hours).
+      await this.control(admin, s.sarvam_direct_campaign_id, 'cancel').catch((e) => console.error('[sarvam] cancel old direct campaign', e));
     }
     const id = await this.createCampaign(admin, {
       name: 'FlashQC CRM – Live calls',
@@ -181,8 +188,8 @@ export const SarvamCalling = {
       line: r.line,
       baseUrl: r.baseUrl,
       maxAttempts: 1,
-      windowStart: s?.default_calling_window_start ?? '09:00',
-      windowEnd: s?.default_calling_window_end ?? '21:00',
+      windowStart,
+      windowEnd,
       days: 365,
       metadata: { crm_kind: 'direct' },
     });
