@@ -230,7 +230,10 @@ export const SarvamCalling = {
     const targets = (list.items ?? []).filter((d) => (d.phone_numbers ?? []).some((p) => ours.has(p)));
     if (!targets.length) throw new AppError('No Sarvam inbound deployment uses the CRM’s numbers. Sync numbers first, or create an inbound deployment in Sarvam.');
     for (const d of targets) {
+      // Sarvam only edits paused deployments: pause, apply, and always resume (a few seconds offline).
+      const wasActive = (d.status ?? '').toLowerCase() === 'active';
       try {
+        if (wasActive) await c.callTool('telephony', { operation: 'pause_deployment', id: d.deployment_id });
         await c.callTool('configure_deployment', { deployment_id: d.deployment_id, webhook_config: this.webhookConfig(baseUrl, { crm_kind: 'inbound' }) });
       } catch (e) {
         // Only blame a draft version when Sarvam's own version list says so.
@@ -243,6 +246,13 @@ export const SarvamCalling = {
           );
         }
         throw e;
+      } finally {
+        if (wasActive) {
+          await c.callTool('telephony', { operation: 'resume_deployment', id: d.deployment_id }).catch(async () => {
+            // One retry; never leave the line paused silently.
+            await c.callTool('telephony', { operation: 'resume_deployment', id: d.deployment_id });
+          });
+        }
       }
     }
     await admin.from('app_settings').update({ sarvam_inbound_webhook_at: new Date().toISOString() }).eq('id', true);
