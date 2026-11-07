@@ -160,8 +160,14 @@ async function attachConversation(admin: DB, callId: string, p: Outbound | Inbou
 }
 
 async function recordEvent(admin: DB, callId: string, type: string, status: string | null, at: string | null, payload: Record<string, unknown>) {
-  const { interaction_transcript: _t, ...rest } = payload;
+  const { interaction_transcript: _t, metadata, ...rest } = payload;
   void _t;
+  // Keep the echoed metadata for traceability, but never the shared secret.
+  if (metadata && typeof metadata === 'object') {
+    const { crm_secret: _s, ...safeMeta } = metadata as Record<string, unknown>;
+    void _s;
+    (rest as Record<string, unknown>).metadata = safeMeta;
+  }
   await admin.from('call_events').insert({
     call_id: callId,
     event_type: type,

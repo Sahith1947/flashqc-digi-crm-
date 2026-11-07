@@ -55,6 +55,7 @@ const vars = { call_summary: 'Owner of Hotel Paradise agreed to a meeting tomorr
   ok(sql(`select status||'|'||outcome from campaign_contacts where id='${cc2}'`) === 'failed|busy', 'terminal busy marks contact failed');
   ok(sql(`select status from campaigns where name='Live pilot'`) === 'completed', 'campaign completes when every contact has a final result');
   ok(sql(`select count(*) from call_transcripts t join calls c on c.id=t.call_id where c.provider_call_id='att-c2-0'`) === '0', 'no transcript invented for unanswered call');
+  ok(sql(`select count(*) from call_events where payload::text like '%${SECRET}%'`) === '0', 'webhook secret never stored in call events');
   [s] = await post({ foo: 'bar' }); ok(s === 500, `unknown payload rejected (${s})`);
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
