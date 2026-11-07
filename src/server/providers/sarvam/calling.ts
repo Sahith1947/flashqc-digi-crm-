@@ -124,7 +124,8 @@ export const SarvamCalling = {
   ): Promise<string> {
     const c = await client(admin);
     const start = new Date(Date.now() + 60_000);
-    const end = new Date(start.getTime() + (input.days ?? 30) * 86400_000);
+    // Sarvam caps a campaign's duration at 90 days.
+    const end = new Date(start.getTime() + Math.min(input.days ?? 30, 85) * 86400_000);
     const res = await c.callTool<{ id?: string | null; campaign_id?: string }>('configure_campaign', {
       name: sarvamName(input.name),
       description: (input.description ?? 'Created by FlashQC Digi CRM').slice(0, 150),
@@ -204,7 +205,7 @@ export const SarvamCalling = {
       maxAttempts: 1,
       windowStart,
       windowEnd,
-      days: 365,
+      days: 85,
       metadata: { crm_kind: 'direct' },
     });
     await admin.from('app_settings').update({ sarvam_direct_campaign_id: id, sarvam_direct_campaign_key: key }).eq('id', true);
