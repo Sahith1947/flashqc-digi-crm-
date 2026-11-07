@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import type { ActionResult } from '@/lib/action-result';
 
 const credentials = z.object({
@@ -38,6 +39,24 @@ export async function signUp(_prev: ActionResult | null, fd: FormData): Promise<
     return { ok: false, error: 'Please fix the highlighted fields.', fieldErrors: Object.fromEntries(parsed.error.issues.map((i) => [String(i.path[0]), i.message])) };
   }
   const db = await createClient();
+  // With the server key available, create the account pre-confirmed: access is gated by admin
+  // approval (new accounts are inactive), so an email round-trip adds friction but no security.
+  const admin = createAdminClient();
+  if (admin) {
+    const { error: createErr } = await admin.auth.admin.createUser({
+      email: parsed.data.email,
+      password: parsed.data.password,
+      email_confirm: true,
+      user_metadata: { full_name: parsed.data.full_name },
+    });
+    if (createErr) {
+      const exists = /already|registered|exists/i.test(createErr.message);
+      return { ok: false, error: exists ? 'An account with this email already exists.' : createErr.message };
+    }
+    const { error: signInErr } = await db.auth.signInWithPassword({ email: parsed.data.email, password: parsed.data.password });
+    if (signInErr) return { ok: true, message: 'Account created. Please sign in.' };
+    redirect('/');
+  }
   const origin = (await headers()).get('origin') ?? '';
   const { data, error } = await db.auth.signUp({
     email: parsed.data.email,

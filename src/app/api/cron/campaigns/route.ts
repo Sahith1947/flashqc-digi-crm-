@@ -29,3 +29,6 @@ export async function POST(req: NextRequest) {
   }
   return NextResponse.json({ processedCampaigns: results.length, results });
 }
+
+// Vercel Cron sends GET with "Authorization: Bearer $CRON_SECRET".
+export const GET = POST;

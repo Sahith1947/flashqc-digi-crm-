@@ -3,7 +3,7 @@ import { Bot, Trash2 } from 'lucide-react';
 import { requireMember } from '@/server/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { SarvamAuth } from '@/server/providers/sarvam/auth';
-import { serverEnv } from '@/server/env';
+import { encryptionAvailable } from '@/server/crypto';
 import { formatDateTime } from '@/lib/dates';
 import { ActionButton } from '@/components/config/sarvam-connect';
 import { syncSarvamAgents } from '../integrations/actions';
@@ -34,7 +34,7 @@ export default async function VoiceAgentsPage() {
   const canManage = hasMinRole(profile.role, 'manager');
   const canAdmin = hasMinRole(profile.role, 'admin');
   const admin = createAdminClient();
-  const sarvam = admin && serverEnv.integrationEncryptionKey ? await SarvamAuth.status(admin) : null;
+  const sarvam = admin && encryptionAvailable() ? await SarvamAuth.status(admin) : null;
   const langLabel = (v: string) => AGENT_LANGUAGES.find((l) => l.value === v)?.label ?? v;
 
   return (

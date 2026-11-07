@@ -1,5 +1,5 @@
 import 'server-only';
-import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
+import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from 'node:crypto';
 import { serverEnv } from '@/server/env';
 
 // AES-256-GCM for secrets stored in the database (provider OAuth tokens).
@@ -7,7 +7,12 @@ import { serverEnv } from '@/server/env';
 
 function key(): Buffer {
   const raw = serverEnv.integrationEncryptionKey;
-  if (!raw) throw new Error('INTEGRATION_ENCRYPTION_KEY is not set on the server.');
+  if (!raw) {
+    // Hosted deploys without an explicit key derive one from a server-only Supabase secret.
+    const base = serverEnv.supabaseJwtSecret || serverEnv.supabaseSecretKey;
+    if (!base) throw new Error('INTEGRATION_ENCRYPTION_KEY is not set on the server.');
+    return Buffer.from(hkdfSync('sha256', base, 'flashqc-crm', 'integration-credentials-v1', 32));
+  }
   const k = Buffer.from(raw, 'base64');
   if (k.length !== 32) throw new Error('INTEGRATION_ENCRYPTION_KEY must be 32 bytes, base64-encoded.');
   return k;
@@ -28,4 +33,9 @@ export function decryptSecret(blob: string, aad: string): string {
   d.setAAD(Buffer.from(aad));
   d.setAuthTag(Buffer.from(tag, 'base64url'));
   return Buffer.concat([d.update(Buffer.from(ct, 'base64url')), d.final()]).toString('utf8');
+}
+
+/** True when secrets can be encrypted (explicit key or a derivable server secret). */
+export function encryptionAvailable(): boolean {
+  return Boolean(serverEnv.integrationEncryptionKey || serverEnv.supabaseJwtSecret || serverEnv.supabaseSecretKey);
 }

@@ -14,7 +14,7 @@ import { PhoneNumberButton } from '@/components/config/config-forms';
 import { ActionButton } from '@/components/config/sarvam-connect';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { SarvamAuth } from '@/server/providers/sarvam/auth';
-import { serverEnv } from '@/server/env';
+import { encryptionAvailable } from '@/server/crypto';
 import { syncSarvamNumbers } from '../integrations/actions';
 import { deletePhoneNumber } from './actions';
 
@@ -30,7 +30,7 @@ export default async function PhoneNumbersPage() {
   const canManage = hasMinRole(profile.role, 'manager');
   const canAdmin = hasMinRole(profile.role, 'admin');
   const admin = createAdminClient();
-  const sarvam = admin && serverEnv.integrationEncryptionKey ? await SarvamAuth.status(admin) : null;
+  const sarvam = admin && encryptionAvailable() ? await SarvamAuth.status(admin) : null;
   return (
     <>
       <PageHeader
