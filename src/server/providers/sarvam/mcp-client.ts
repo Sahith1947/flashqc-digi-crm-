@@ -85,7 +85,7 @@ export class SarvamMcpClient {
       const status = /\((\d{3})\)\s*([A-Za-z ]{3,40})/.exec(text);
       const code = /"code":\s*"([a-z_]+)"/.exec(text)?.[1];
       const reason = status ? `${status[2].trim().toLowerCase()} (HTTP ${status[1]})` : code ? code.replace(/_/g, ' ') : 'request refused';
-      throw new AppError(`Sarvam refused ${name.replace(/_/g, ' ')}: ${reason}.`, 'sarvam_tool');
+      throw new AppError(`Sarvam refused ${name.replace(/_/g, ' ')}: ${reason}.`, 'sarvam_tool', text.slice(0, 4000));
     }
     try {
       return JSON.parse(text) as T;

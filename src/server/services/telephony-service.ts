@@ -93,8 +93,10 @@ export const TelephonyService = {
       return { callId: call.id, simulated: false, status: 'queued', outcome: null };
     } catch (err) {
       const reason = err instanceof Error ? err.message : 'Sarvam error';
+      const detail = err instanceof AppError ? (err.detail ?? null) : null;
       await db.from('calls').update({ status: 'failed', failure_reason: reason.slice(0, 500) }).eq('id', call.id);
-      await CallEventService.record(db, call.id, { type: 'failed', status: 'failed', source: 'system', payload: { reason } });
+      // System events are written with the backend client (users may only add 'user' events).
+      await CallEventService.record(admin, call.id, { type: 'failed', status: 'failed', source: 'system', payload: { reason, detail } }).catch((e) => console.error('[telephony] event', e));
       throw err instanceof AppError ? err : new AppError(`Sarvam rejected the call: ${reason}`, 'provider_error');
     }
   },
@@ -179,7 +181,7 @@ export const TelephonyService = {
     } catch (err) {
       const reason = err instanceof Error ? err.message : 'Provider error';
       await db.from('calls').update({ status: 'failed', failure_reason: reason.slice(0, 500) }).eq('id', call.id);
-      await CallEventService.record(db, call.id, { type: 'failed', status: 'failed', source: 'system', payload: { reason } });
+      await CallEventService.record(admin, call.id, { type: 'failed', status: 'failed', source: 'system', payload: { reason } });
       throw err instanceof AppError ? err : new AppError(`Provider rejected the call: ${reason}`, 'provider_error');
     }
   },

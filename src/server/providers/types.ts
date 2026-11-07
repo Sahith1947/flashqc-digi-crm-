@@ -9,6 +9,8 @@ export class AppError extends Error {
   constructor(
     message: string,
     public readonly code: string = 'app_error',
+    /** Technical detail for admins/logs (never shown in toasts). */
+    public readonly detail?: string,
   ) {
     super(message);
     this.name = 'AppError';

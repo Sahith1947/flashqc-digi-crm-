@@ -197,6 +197,12 @@ export default async function CallDetailPage(props: PageProps<'/calls/[id]'>) {
                         {formatDateTime(e.occurred_at)} · source: {e.source}
                         {e.status && ` · status: ${e.status}`}
                       </p>
+                      {canAdmin && e.payload && typeof e.payload === 'object' && Object.keys(e.payload as object).length > 0 && (
+                        <details className="mt-1" data-testid="event-details">
+                          <summary className="cursor-pointer text-xs text-ink-3 hover:text-ink">Technical details</summary>
+                          <pre className="mt-1 max-h-64 overflow-auto rounded-md bg-canvas p-2 text-[11px] whitespace-pre-wrap text-ink-2">{JSON.stringify(e.payload, null, 2).slice(0, 6000)}</pre>
+                        </details>
+                      )}
                     </li>
                   ))}
                 </ol>
