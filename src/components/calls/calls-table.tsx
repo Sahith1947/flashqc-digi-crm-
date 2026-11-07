@@ -1,8 +1,8 @@
 import Link from 'next/link';
-import { FileText, Sparkles } from 'lucide-react';
 import { RecordingPlayButton } from './recording-play-button';
 import { SelectAllCalls } from './bulk-call-actions';
 import { BULK_FORM_ID } from './bulk-form-id';
+import { EmotionBadge } from '@/components/contacts/lead-badges';
 import type { CallLogRow } from '@/lib/supabase/types';
 import { CALL_OUTCOME_LABELS, labelFor } from '@/lib/constants';
 import { formatDateTime, formatDuration } from '@/lib/dates';
@@ -16,7 +16,8 @@ export function callRef(n: number | null | undefined) {
   return n ? `CL-${String(n).padStart(6, '0')}` : '—';
 }
 
-type Column = 'direction' | 'campaign' | 'business' | 'artifacts' | 'outcome';
+/** 'business' is kept for older callers; the business now shows under the contact name. 'artifacts' is the Recording column. */
+type Column = 'direction' | 'campaign' | 'business' | 'artifacts' | 'outcome' | 'emotion';
 
 export function CallsTable({
   rows,
@@ -45,14 +46,14 @@ export function CallsTable({
             )}
             {header('Call ID', 'call_number')}
             <Th>Contact</Th>
-            {show('business') && <Th>Business</Th>}
             {show('direction') && <Th>Direction</Th>}
             {header('Date & time (IST)', 'started_at')}
             {header('Duration', 'duration_seconds')}
             {header('Status', 'status')}
-            {show('campaign') && <Th>Campaign</Th>}
-            {show('artifacts') && <Th>Recording · AI</Th>}
+            {show('emotion') && <Th>Emotion</Th>}
+            {show('artifacts') && <Th>Recording</Th>}
             {show('outcome') && <Th>Outcome</Th>}
+            {show('campaign') && <Th>Campaign</Th>}
           </tr>
         </thead>
         <tbody>
@@ -76,10 +77,12 @@ export function CallsTable({
               <Td className="min-w-40">
                 <div className="min-w-0">
                   <p className="truncate font-medium">{c.contact_name || <span className="text-ink-3">Unknown</span>}</p>
-                  <p className="tabular text-xs whitespace-nowrap text-ink-3">{formatPhone(c.phone_e164)}</p>
+                  <p className="tabular text-xs whitespace-nowrap text-ink-3">
+                    {formatPhone(c.phone_e164)}
+                    {c.business_name ? ` · ${c.business_name}` : ''}
+                  </p>
                 </div>
               </Td>
-              {show('business') && <Td className="max-w-48 truncate text-ink-2">{c.business_name || '—'}</Td>}
               {show('direction') && (
                 <Td>
                   <DirectionBadge direction={c.direction ?? ''} />
@@ -90,6 +93,17 @@ export function CallsTable({
               <Td>
                 <CallStatusBadge status={c.status ?? ''} />
               </Td>
+              {show('emotion') && (
+                <Td>
+                  <EmotionBadge emotion={c.emotion} />
+                </Td>
+              )}
+              {show('artifacts') && (
+                <Td>
+                  <RecordingPlayButton callId={c.id!} hasRecording={Boolean(c.has_recording)} answered={Boolean(c.is_answered)} simulated={Boolean(c.is_simulated)} label={c.contact_name || c.phone_e164 || 'call'} />
+                </Td>
+              )}
+              {show('outcome') && <Td className="whitespace-nowrap text-ink-2">{labelFor(CALL_OUTCOME_LABELS, c.outcome)}</Td>}
               {show('campaign') && (
                 <Td className="max-w-40 truncate">
                   {c.campaign_id ? (
@@ -101,16 +115,6 @@ export function CallsTable({
                   )}
                 </Td>
               )}
-              {show('artifacts') && (
-                <Td>
-                  <span className="flex items-center gap-2 text-ink-3">
-                    <RecordingPlayButton callId={c.id!} hasRecording={Boolean(c.has_recording)} label={c.contact_name || c.phone_e164 || 'call'} />
-                    <FileText className={c.has_transcript ? 'size-4 text-ink' : 'size-4 opacity-30'} aria-label={c.has_transcript ? 'Has transcript' : 'No transcript'} />
-                    <Sparkles className={c.has_summary ? 'size-4 text-ink' : 'size-4 opacity-30'} aria-label={c.has_summary ? 'Has summary' : 'No summary'} />
-                  </span>
-                </Td>
-              )}
-              {show('outcome') && <Td className="whitespace-nowrap text-ink-2">{labelFor(CALL_OUTCOME_LABELS, c.outcome)}</Td>}
             </Tr>
           ))}
         </tbody>

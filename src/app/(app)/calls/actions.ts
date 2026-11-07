@@ -158,8 +158,7 @@ export async function deleteCall(callId: string): Promise<ActionResult> {
     const { data, error } = await db.from('calls').delete().eq('id', id).select('id');
     if (error) throw error;
     if (!data?.length) throw new AppError('Call not found or you lack permission.');
-    revalidatePath('/calls');
-    revalidatePath('/');
+    revalidatePath('/', 'layout'); // dashboard, analytics, contacts, recordings… all recalculate
     return { ok: true, message: 'Call deleted. Call IDs were renumbered.' };
   });
   if (res.ok) redirect('/calls?deleted=1');
@@ -176,9 +175,7 @@ export async function deleteCalls(callIds: string[]): Promise<ActionResult> {
     const { data, error } = await db.from('calls').delete().in('id', ids).select('id');
     if (error) throw error;
     if (!data?.length) throw new AppError('Those calls were not found or you lack permission.');
-    revalidatePath('/calls');
-    revalidatePath('/recordings');
-    revalidatePath('/');
+    revalidatePath('/', 'layout'); // dashboard, analytics, contacts, recordings… all recalculate
     const n = data.length;
     return { ok: true, message: `${n} call${n === 1 ? '' : 's'} deleted. Call IDs were renumbered so there are no gaps.` };
   });

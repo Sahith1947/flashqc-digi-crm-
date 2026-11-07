@@ -185,10 +185,10 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Insert: {
-                    "answered_at"?: string | null,"call_number"?: never,"campaign_id"?: string | null,"contact_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"direction": string,"duration_seconds"?: number,"ended_at"?: string | null,"failure_reason"?: string | null,"id"?: string,"is_simulated"?: boolean,"notes"?: string | null,"outcome"?: string | null,"phone_e164": string,"phone_number_id"?: string | null,"provider"?: string | null,"provider_call_id"?: string | null,"started_at"?: string,"status"?: string,"updated_at"?: string,"voice_agent_id"?: string | null
+                    "answered_at"?: string | null,"call_number"?: number,"campaign_id"?: string | null,"contact_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"direction": string,"duration_seconds"?: number,"ended_at"?: string | null,"failure_reason"?: string | null,"id"?: string,"is_simulated"?: boolean,"notes"?: string | null,"outcome"?: string | null,"phone_e164": string,"phone_number_id"?: string | null,"provider"?: string | null,"provider_call_id"?: string | null,"started_at"?: string,"status"?: string,"updated_at"?: string,"voice_agent_id"?: string | null
                   }
                   Update: {
-                    "answered_at"?: string | null,"call_number"?: never,"campaign_id"?: string | null,"contact_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"direction"?: string,"duration_seconds"?: number,"ended_at"?: string | null,"failure_reason"?: string | null,"id"?: string,"is_simulated"?: boolean,"notes"?: string | null,"outcome"?: string | null,"phone_e164"?: string,"phone_number_id"?: string | null,"provider"?: string | null,"provider_call_id"?: string | null,"started_at"?: string,"status"?: string,"updated_at"?: string,"voice_agent_id"?: string | null
+                    "answered_at"?: string | null,"call_number"?: number,"campaign_id"?: string | null,"contact_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"direction"?: string,"duration_seconds"?: number,"ended_at"?: string | null,"failure_reason"?: string | null,"id"?: string,"is_simulated"?: boolean,"notes"?: string | null,"outcome"?: string | null,"phone_e164"?: string,"phone_number_id"?: string | null,"provider"?: string | null,"provider_call_id"?: string | null,"started_at"?: string,"status"?: string,"updated_at"?: string,"voice_agent_id"?: string | null
                   }
                   Relationships: [
                     {
@@ -450,7 +450,7 @@ isOneToOne: false
           Views: {
             "call_log_view": {
                   Row: {
-                    "answered_at": string | null,"business_name": string | null,"business_phone_e164": string | null,"call_number": number,"campaign_id": string | null,"campaign_name": string | null,"contact_id": string | null,"contact_name": string | null,"created_at": string,"created_by": string | null,"direction": string,"duration_seconds": number,"ended_at": string | null,"failure_reason": string | null,"has_recording": boolean | null,"has_summary": boolean | null,"has_transcript": boolean | null,"id": string,"is_answered": boolean | null,"is_simulated": boolean,"notes": string | null,"outcome": string | null,"phone_e164": string,"phone_number_id": string | null,"phone_number_label": string | null,"provider": string | null,"provider_call_id": string | null,"started_at": string,"status": string,"updated_at": string,"voice_agent_id": string | null,"voice_agent_name": string | null
+                    "answered_at": string | null,"business_name": string | null,"business_phone_e164": string | null,"call_number": number,"campaign_id": string | null,"campaign_name": string | null,"contact_id": string | null,"contact_name": string | null,"created_at": string,"created_by": string | null,"direction": string,"duration_seconds": number,"emotion": string | null,"ended_at": string | null,"failure_reason": string | null,"has_recording": boolean | null,"has_summary": boolean | null,"has_transcript": boolean | null,"id": string,"is_answered": boolean | null,"is_simulated": boolean,"notes": string | null,"outcome": string | null,"phone_e164": string,"phone_number_id": string | null,"phone_number_label": string | null,"provider": string | null,"provider_call_id": string | null,"sentiment": string | null,"started_at": string,"status": string,"updated_at": string,"voice_agent_id": string | null,"voice_agent_name": string | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -593,6 +593,9 @@ isOneToOne: false
 { Args: { "p_from": string,"p_scope"?: string,"p_to": string }; Returns: {
               "outcome": string,"total": number
             }[]
+                           },
+"renumber_call_numbers":
+{ Args: Record<PropertyKey, never>; Returns: undefined
                            },
 "role_rank":
 { Args: { "p_role": string }; Returns: number

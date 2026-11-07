@@ -917,6 +917,19 @@ function contactsCsv() {
     await goto(agent.page, '/calls');
     assert((await agent.page.getByTestId('bulk-call-actions').count()) === 0, 'bulk delete visible to agent');
   });
+  await step('After deleting, dashboard and analytics match the database right away', async () => {
+    const total = sql("select count(*) from calls where started_at >= now() - interval '31 days' and status <> 'queued'");
+    await goto(admin.page, '/?range=30d&scope=all');
+    const card = (await admin.page.getByTestId('stat-total-calls').textContent()).replace(/[,\s]/g, '');
+    assert(card === total, `dashboard total ${card} vs db ${total}`);
+    await goto(admin.page, '/analytics?range=30d&scope=all');
+    await admin.page.getByText(new RegExp(`of ${Number(total).toLocaleString('en-IN')} calls`)).first().waitFor();
+  });
+  await step('Call Logs show Emotion and Recording columns', async () => {
+    await goto(admin.page, '/calls');
+    const heads = await admin.page.locator('[data-testid=calls-table] thead th').allInnerTexts();
+    assert(heads.some((h) => /emotion/i.test(h)) && heads.some((h) => /recording/i.test(h)), `headers: ${heads.join('|')}`);
+  });
   await step('Manager-only delete of contact (admin) works and unlinks calls', async () => {
     const id = sql("select id from contacts where full_name='Walk-in Caller'");
     const phone = sql(`select phone_e164 from contacts where id='${id}'`);
