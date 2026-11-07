@@ -143,3 +143,30 @@ export async function importContacts(rows: ContactInput[], existing: 'skip' | 'u
     };
   });
 }
+
+export async function setLeadStage(contactId: string, stage: string): Promise<ActionResult> {
+  return runAction(async () => {
+    const { db } = await assertRole('agent');
+    const { LEAD_STAGES } = await import('@/lib/leads');
+    const st = z.enum(LEAD_STAGES).parse(stage);
+    const { data, error } = await db.from('contacts').update({ lead_stage: st, lead_updated_at: new Date().toISOString() }).eq('id', z.string().uuid().parse(contactId)).select('id');
+    if (error) throw error;
+    if (!data?.length) return { ok: false, error: 'Contact not found or you lack permission.' };
+    refresh(contactId);
+    return { ok: true, message: 'Lead stage updated.' };
+  });
+}
+
+export async function backfillLeadsFromCalls(): Promise<ActionResult> {
+  return runAction(async () => {
+    await assertRole('admin');
+    const { createAdminClient } = await import('@/lib/supabase/admin');
+    const { SarvamWebhookService } = await import('@/server/services/sarvam-webhook-service');
+    const admin = createAdminClient();
+    if (!admin) return { ok: false, error: 'SUPABASE_SECRET_KEY is not set on the server.' };
+    const r = await SarvamWebhookService.backfillLeads(admin);
+    refresh();
+    revalidatePath('/');
+    return { ok: true, message: `Processed ${r.calls} past AI call${r.calls === 1 ? '' : 's'}: ${r.created} new lead${r.created === 1 ? '' : 's'} created, stages and emotions updated.` };
+  });
+}

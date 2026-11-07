@@ -3,9 +3,10 @@ import type { DB } from '@/lib/supabase/types';
 import { CONSENT_STATUSES, DND_STATUSES } from '@/lib/constants';
 import { parseEnum, parsePage, parseSort, searchTerm } from '@/lib/list-params';
 import { normalizePhone } from '@/lib/phone';
+import { LEAD_STAGES, LEAD_TEMPERATURES } from '@/lib/leads';
 
 export const CONTACTS_PAGE_SIZE = 25;
-export const CONTACT_SORTS = ['full_name', 'created_at', 'total_calls', 'last_call_at', 'city'] as const;
+export const CONTACT_SORTS = ['full_name', 'created_at', 'total_calls', 'last_call_at', 'city', 'lead_updated_at'] as const;
 
 export interface ContactFilters {
   q?: string;
@@ -15,6 +16,8 @@ export interface ContactFilters {
   consent?: (typeof CONSENT_STATUSES)[number];
   dnd?: (typeof DND_STATUSES)[number];
   suppressed?: 'yes' | 'no';
+  stage?: (typeof LEAD_STAGES)[number];
+  temperature?: (typeof LEAD_TEMPERATURES)[number];
 }
 
 export function parseContactFilters(p: Record<string, string | undefined>): ContactFilters {
@@ -26,6 +29,8 @@ export function parseContactFilters(p: Record<string, string | undefined>): Cont
     consent: parseEnum(p.consent, CONSENT_STATUSES),
     dnd: parseEnum(p.dnd, DND_STATUSES),
     suppressed: parseEnum(p.suppressed, ['yes', 'no'] as const),
+    stage: parseEnum(p.stage, LEAD_STAGES),
+    temperature: parseEnum(p.temperature, LEAD_TEMPERATURES),
   };
 }
 
@@ -38,6 +43,8 @@ export function applyContactFilters<Q extends { eq: any; or: any; ilike: any }>(
   if (f.consent) q = q.eq('consent_status', f.consent);
   if (f.dnd) q = q.eq('dnd_status', f.dnd);
   if (f.suppressed) q = q.eq('is_suppressed', f.suppressed === 'yes');
+  if (f.stage) q = q.eq('lead_stage', f.stage);
+  if (f.temperature) q = q.eq('lead_temperature', f.temperature);
   const term = searchTerm(f.q);
   if (term) {
     const phone = normalizePhone(f.q);

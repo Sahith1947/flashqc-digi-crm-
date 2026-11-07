@@ -165,3 +165,36 @@ export async function deleteCall(callId: string): Promise<ActionResult> {
   if (res.ok) redirect('/calls?deleted=1');
   return res;
 }
+
+export async function checkSarvamRecording(callId: string): Promise<ActionResult> {
+  return runAction(async () => {
+    await assertRole('agent');
+    const { createAdminClient } = await import('@/lib/supabase/admin');
+    const { SarvamService } = await import('@/server/services/sarvam-service');
+    const admin = createAdminClient();
+    if (!admin) return { ok: false, error: 'SUPABASE_SECRET_KEY is not set on the server.' };
+    const id = uuid.parse(callId);
+    const res = await SarvamService.fetchRecording(admin, id);
+    refreshCall(id);
+    if (res === 'attached') return { ok: true, message: 'Recording found in Sarvam and attached.' };
+    if (res === 'already') return { ok: true, message: 'This call already has a recording.' };
+    if (res === 'not_applicable') return { ok: false, error: 'Only answered Sarvam calls have recordings.' };
+    return {
+      ok: false,
+      error: 'Sarvam has no recording for this call. Call recording appears to be switched off for your Sarvam workspace or phone number — ask Sarvam support to enable it; new calls will then show recordings automatically.',
+    };
+  });
+}
+
+export async function getCallPlayback(callId: string): Promise<{ url: string | null; error: string | null }> {
+  const { db } = await assertRole('viewer');
+  const { data: rec } = await db
+    .from('call_recordings')
+    .select('storage_bucket, storage_path, provider_recording_id, provider_recording_url')
+    .eq('call_id', uuid.parse(callId))
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!rec) return { url: null, error: 'No recording for this call.' };
+  return RecordingService.getPlaybackUrl(db, rec);
+}

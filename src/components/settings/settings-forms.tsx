@@ -40,7 +40,7 @@ export function OrgSettingsForm({ s, canEdit }: { s: { company_name: string; def
         <Field label="Default calling window start (IST)" htmlFor="os_start">
           <Input id="os_start" name="default_calling_window_start" type="time" defaultValue={s.default_calling_window_start.slice(0, 5)} required disabled={!canEdit} />
         </Field>
-        <Field label="Default calling window end (IST)" htmlFor="os_end" error={fe?.default_calling_window_end}>
+        <Field label="Default calling window end (IST)" htmlFor="os_end" error={fe?.default_calling_window_end} hint="Use 00:00–23:59 for 24 hours. TRAI rules and Indian carriers may still block promotional calls between 9 PM and 9 AM.">
           <Input id="os_end" name="default_calling_window_end" type="time" defaultValue={s.default_calling_window_end.slice(0, 5)} required disabled={!canEdit} />
         </Field>
       </div>

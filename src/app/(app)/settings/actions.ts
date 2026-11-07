@@ -5,6 +5,7 @@ import type { ActionResult } from '@/lib/action-result';
 import { ROLES, SUPPRESSION_SOURCES } from '@/lib/constants';
 import { normalizePhone } from '@/lib/phone';
 import { assertRole } from '@/server/auth';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { formBool, formOptional, formString, runAction } from '@/server/action-utils';
 
 export async function updateProfile(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
@@ -42,7 +43,18 @@ export async function updateOrgSettings(_prev: ActionResult | null, fd: FormData
     if (error) throw error;
     if (!rows?.length) return { ok: false, error: 'Settings could not be saved.' };
     revalidatePath('/', 'layout');
-    return { ok: true, message: 'Organisation settings saved.' };
+    // Push new calling hours to Sarvam's live-call campaign so waiting calls follow them immediately.
+    let extra = '';
+    const admin = createAdminClient();
+    if (admin) {
+      try {
+        const { SarvamCalling } = await import('@/server/providers/sarvam/calling');
+        if (await SarvamCalling.applyCallingHours(admin)) extra = ' Calling hours applied to Sarvam live calls.';
+      } catch (e) {
+        extra = ` Saved, but Sarvam could not be updated yet: ${e instanceof Error ? e.message : 'unknown error'}`;
+      }
+    }
+    return { ok: true, message: `Organisation settings saved.${extra}` };
   });
 }
 

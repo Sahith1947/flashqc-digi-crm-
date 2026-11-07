@@ -13,6 +13,8 @@ export interface Summary {
   simulated: number;
   talk_time_seconds: number;
   avg_duration_seconds: number;
+  /** live calls sent to the provider and waiting to dial (not counted as calls yet) */
+  queued: number;
   status_distribution: Record<string, number>;
 }
 

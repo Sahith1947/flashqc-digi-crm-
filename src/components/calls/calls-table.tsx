@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { AudioLines, FileText, Sparkles } from 'lucide-react';
+import { FileText, Sparkles } from 'lucide-react';
+import { RecordingPlayButton } from './recording-play-button';
 import type { CallLogRow } from '@/lib/supabase/types';
 import { CALL_OUTCOME_LABELS, labelFor } from '@/lib/constants';
 import { formatDateTime, formatDuration } from '@/lib/dates';
@@ -40,7 +41,7 @@ export function CallsTable({
             {header('Duration', 'duration_seconds')}
             {header('Status', 'status')}
             {show('campaign') && <Th>Campaign</Th>}
-            {show('artifacts') && <Th>Rec · Summary</Th>}
+            {show('artifacts') && <Th>Recording · AI</Th>}
             {show('outcome') && <Th>Outcome</Th>}
           </tr>
         </thead>
@@ -88,7 +89,7 @@ export function CallsTable({
               {show('artifacts') && (
                 <Td>
                   <span className="flex items-center gap-2 text-ink-3">
-                    <AudioLines className={c.has_recording ? 'size-4 text-ink' : 'size-4 opacity-30'} aria-label={c.has_recording ? 'Has recording' : 'No recording'} />
+                    <RecordingPlayButton callId={c.id!} hasRecording={Boolean(c.has_recording)} label={c.contact_name || c.phone_e164 || 'call'} />
                     <FileText className={c.has_transcript ? 'size-4 text-ink' : 'size-4 opacity-30'} aria-label={c.has_transcript ? 'Has transcript' : 'No transcript'} />
                     <Sparkles className={c.has_summary ? 'size-4 text-ink' : 'size-4 opacity-30'} aria-label={c.has_summary ? 'Has summary' : 'No summary'} />
                   </span>

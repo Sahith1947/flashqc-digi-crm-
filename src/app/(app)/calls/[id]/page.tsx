@@ -20,6 +20,9 @@ import { callRef } from '@/components/calls/calls-table';
 import { OutcomeForm, RecordingUploader, SaveContactForm } from '@/components/calls/call-detail-forms';
 import { EditableSection } from '@/components/calls/editable-section';
 import { deleteCall, deleteRecording, deleteSummary, deleteTranscript } from '../actions';
+import { EmotionBadge } from '@/components/contacts/lead-badges';
+import { scheduleRecordingCheck } from '@/server/recording-sync';
+import { CheckRecordingButton } from '@/components/calls/check-recording-button';
 
 export const metadata: Metadata = { title: 'Call details' };
 
@@ -46,10 +49,14 @@ export default async function CallDetailPage(props: PageProps<'/calls/[id]'>) {
     db.from('call_transcripts').select('*').eq('call_id', id).maybeSingle(),
     db.from('call_summaries').select('*').eq('call_id', id).maybeSingle(),
   ]);
+  const waitingOnSarvam = !call.is_simulated && call.status === 'queued' && events.some((e) => e.event_type === 'submitted_to_sarvam' || e.event_type === 'resubmitted_to_sarvam');
+  const { data: hours } = waitingOnSarvam ? await db.from('app_settings').select('default_calling_window_start, default_calling_window_end').maybeSingle() : { data: null };
   const recordings = await Promise.all(
     (recordingsRes.data ?? []).map(async (r) => ({ ...r, playback: await RecordingService.getPlaybackUrl(db, r) })),
   );
   const transcript = transcriptRes.data;
+  const sarvamAnswered = !call.is_simulated && call.provider === 'sarvam' && call.is_answered;
+  if (sarvamAnswered && recordings.length === 0) scheduleRecordingCheck(id);
   const summary = summaryRes.data;
   const ai = TranscriptService.isAiAvailable();
   const canAgent = hasMinRole(profile.role, 'agent');
@@ -91,12 +98,24 @@ export default async function CallDetailPage(props: PageProps<'/calls/[id]'>) {
         </Notice>
       )}
 
+      {waitingOnSarvam && (
+        <Notice tone="info" className="mb-6">
+          Sent to Sarvam and waiting to dial. Sarvam places it within your calling hours
+          {hours ? ` (${hours.default_calling_window_start.slice(0, 5)}–${hours.default_calling_window_end.slice(0, 5)} IST, set in Settings → Organisation)` : ''}; the result,
+          transcript and summary appear here when the call ends.
+        </Notice>
+      )}
       <div className="grid gap-6 xl:grid-cols-3">
         <div className="space-y-6 xl:col-span-2">
           <Card>
             <CardHeader title="Recording" description="Private storage · signed playback links expire after 1 hour" />
             <CardBody className="space-y-4">
-              {recordings.length === 0 && <p className="text-sm text-ink-3">No recording for this call.</p>}
+              {recordings.length === 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm text-ink-3">{sarvamAnswered ? 'Sarvam has not provided a recording for this call yet. The CRM checks again automatically.' : 'No recording for this call.'}</p>
+                  {sarvamAnswered && canAgent && <CheckRecordingButton callId={id} />}
+                </div>
+              )}
               {recordings.map((r) => (
                 <div key={r.id} className="rounded-lg border border-line p-3">
                   <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-ink-3">
@@ -147,7 +166,19 @@ export default async function CallDetailPage(props: PageProps<'/calls/[id]'>) {
                 emptyLabel="No summary yet."
                 view={
                   <div className="space-y-2" data-testid="summary-view">
-                    {summary?.sentiment && <Badge tone={summary.sentiment === 'positive' ? 'good' : summary.sentiment === 'negative' ? 'critical' : 'neutral'}>{summary.sentiment}</Badge>}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {summary?.emotion && <EmotionBadge emotion={summary.emotion} />}
+                      {summary?.sentiment && <Badge tone={summary.sentiment === 'positive' ? 'good' : summary.sentiment === 'negative' ? 'critical' : 'neutral'}>{summary.sentiment}</Badge>}
+                    </div>
+                    {Array.isArray(summary?.key_points) && (summary!.key_points as string[]).length > 0 && (
+                      <ul className="flex flex-wrap gap-2 text-xs" data-testid="lead-points">
+                        {(summary!.key_points as string[]).map((k) => (
+                          <li key={k} className="rounded-md bg-canvas px-2 py-1 text-ink-2">
+                            {k}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                     <p className="text-sm whitespace-pre-wrap text-ink">{summary?.summary}</p>
                   </div>
                 }

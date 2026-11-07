@@ -179,7 +179,12 @@ export const SarvamCalling = {
     }
   },
 
-  /** The always-on campaign used for one-off Live calls, recreated if the agent version or number changes. */
+  /**
+   * The always-on campaign used for one-off Live calls.
+   * - Calling hours changed → the same campaign's schedule is updated in place (queued calls keep their place).
+   * - Agent version, number or site address changed → a new campaign replaces it, the old one is cancelled,
+   *   and calls still waiting in the old one are moved to the new one.
+   */
   async directCampaign(admin: DB, r: Extract<Readiness, { ok: true }>): Promise<string> {
     const { data: s } = await admin
       .from('app_settings')
@@ -187,16 +192,23 @@ export const SarvamCalling = {
       .maybeSingle();
     const windowStart = s?.default_calling_window_start ?? '09:00';
     const windowEnd = s?.default_calling_window_end ?? '21:00';
-    // The calling hours are part of the key: changing them in Settings replaces the campaign.
-    const key = `${r.agent.appId}@v${r.agent.version}|${r.line.phone}|${r.baseUrl}|${hhmm(windowStart)}-${hhmm(windowEnd)}`;
-    if (s?.sarvam_direct_campaign_id && s.sarvam_direct_campaign_key === key) {
-      const status = (await this.campaignStatus(admin, s.sarvam_direct_campaign_id))?.toLowerCase() ?? '';
-      if (!/cancel|complete|expired|fail/.test(status)) return s.sarvam_direct_campaign_id;
+    const base = `${r.agent.appId}@v${r.agent.version}|${r.line.phone}|${r.baseUrl}`;
+    const win = `${hhmm(windowStart)}-${hhmm(windowEnd)}`;
+    const key = `${base}#${win}`;
+    const [storedBase, storedWin] = (s?.sarvam_direct_campaign_key ?? '').split('#');
+    const currentId = s?.sarvam_direct_campaign_id ?? null;
+
+    if (currentId && storedBase === base) {
+      const status = (await this.campaignStatus(admin, currentId))?.toLowerCase() ?? '';
+      if (!/cancel|complete|expired|fail/.test(status)) {
+        if (storedWin !== win) {
+          await this.updateSchedule(admin, currentId, windowStart, windowEnd, status);
+          await admin.from('app_settings').update({ sarvam_direct_campaign_key: key }).eq('id', true);
+        }
+        return currentId;
+      }
     }
-    if (s?.sarvam_direct_campaign_id && s.sarvam_direct_campaign_key !== key) {
-      // Retire the previous one so it can never dial with outdated settings (e.g. wider hours).
-      await this.control(admin, s.sarvam_direct_campaign_id, 'cancel').catch((e) => console.error('[sarvam] cancel old direct campaign', e));
-    }
+
     const id = await this.createCampaign(admin, {
       name: 'FlashQC CRM Live calls',
       description: 'One-off live calls placed from the FlashQC Digi CRM',
@@ -210,7 +222,75 @@ export const SarvamCalling = {
       metadata: { crm_kind: 'direct' },
     });
     await admin.from('app_settings').update({ sarvam_direct_campaign_id: id, sarvam_direct_campaign_key: key }).eq('id', true);
+    if (currentId && currentId !== id) {
+      // Retire the old campaign so it never dials with outdated settings, then move its waiting calls.
+      await this.control(admin, currentId, 'cancel').catch((e) => console.error('[sarvam] cancel old direct campaign', e));
+      await this.restreamQueued(admin, currentId, id).catch((e) => console.error('[sarvam] restream queued calls', e));
+    }
     return id;
+  },
+
+  /** Sarvam edits only paused or scheduled campaigns: pause (if active), patch the hours, resume. */
+  async updateSchedule(admin: DB, campaignId: string, windowStart: string, windowEnd: string, status: string) {
+    const c = await client(admin);
+    const active = status === 'active' || status === 'running';
+    if (active) await c.callTool('campaigns', { operation: 'pause', id: campaignId });
+    try {
+      await c.callTool('configure_campaign', {
+        campaign_id: campaignId,
+        allowed_schedule: { timezone: 'Asia/Kolkata', allowed_start_time: hhmm(windowStart), allowed_end_time: hhmm(windowEnd), allowed_days: ALL_DAYS },
+      });
+    } finally {
+      if (active) await c.callTool('campaigns', { operation: 'resume', id: campaignId });
+    }
+  },
+
+  /** Re-submits CRM live calls that were still waiting in a replaced campaign. */
+  async restreamQueued(admin: DB, oldCampaignId: string, newCampaignId: string): Promise<number> {
+    const { data: events } = await admin
+      .from('call_events')
+      .select('call_id')
+      .in('event_type', ['submitted_to_sarvam', 'resubmitted_to_sarvam'])
+      .eq('payload->>sarvam_campaign_id', oldCampaignId);
+    const ids = [...new Set((events ?? []).map((e) => e.call_id))];
+    if (!ids.length) return 0;
+    const { data: calls } = await admin
+      .from('calls')
+      .select('id, phone_e164, contacts(full_name, business_name, business_category, city)')
+      .in('id', ids)
+      .eq('status', 'queued')
+      .is('provider_call_id', null);
+    type Row = { id: string; phone_e164: string; contacts: { full_name: string | null; business_name: string | null; business_category: string | null; city: string | null } | null };
+    const rows = (calls ?? []) as unknown as Row[];
+    if (!rows.length) return 0;
+    const users = rows.map((r) => {
+      const v: Record<string, string> = {};
+      if (r.contacts?.full_name) v.user_name = r.contacts.full_name;
+      if (r.contacts?.business_name) v.business_name = r.contacts.business_name;
+      if (r.contacts?.business_category) v.business_category = r.contacts.business_category;
+      if (r.contacts?.city) v.location = r.contacts.city;
+      return { user_phone_number: r.phone_e164, user_identifier: `call:${r.id}`, app_variables: v };
+    });
+    const cohorts = await this.streamUsers(admin, newCampaignId, 'CRM resubmitted calls', users);
+    await admin.from('call_events').insert(
+      rows.map((r) => ({
+        call_id: r.id,
+        event_type: 'resubmitted_to_sarvam',
+        status: 'queued',
+        source: 'system' as const,
+        payload: { sarvam_campaign_id: newCampaignId, replaced_campaign_id: oldCampaignId, cohort_ids: cohorts },
+      })),
+    );
+    return rows.length;
+  },
+
+  /** Applies the current calling hours to the live-call campaign right away (called after Settings change). */
+  async applyCallingHours(admin: DB): Promise<string | null> {
+    const r = await this.readiness(admin);
+    if (!r.ok) return null;
+    const { data: s } = await admin.from('app_settings').select('sarvam_direct_campaign_id').maybeSingle();
+    if (!s?.sarvam_direct_campaign_id) return null; // created with the right hours on the first live call
+    return this.directCampaign(admin, r);
   },
 
   /** Publishes (commits) an agent's current draft in Sarvam, so deployments and campaigns may use it. */

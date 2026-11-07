@@ -193,4 +193,75 @@ export const SarvamService = {
     }
     return { connections: conns.length, connectionSummary: conns.map((x) => ({ provider: x.channel_provider, status: x.status })), imported, skipped };
   },
+
+  /**
+   * Looks up a call's recording in Sarvam analytics (the webhook can arrive before the audio exists,
+   * or without it). Attaches it when Sarvam has one; never invents a URL.
+   */
+  async fetchRecording(admin: DB, callId: string): Promise<'attached' | 'already' | 'not_available' | 'not_applicable'> {
+    const { data: call } = await admin
+      .from('calls')
+      .select('id, provider, provider_call_id, direction, started_at, ended_at, answered_at, is_simulated')
+      .eq('id', callId)
+      .maybeSingle();
+    if (!call || call.is_simulated || call.provider !== 'sarvam' || !call.answered_at) return 'not_applicable';
+    const { count } = await admin.from('call_recordings').select('id', { count: 'exact', head: true }).eq('call_id', callId);
+    if (count) return 'already';
+    const { data: ev } = await admin
+      .from('call_events')
+      .select('payload')
+      .eq('call_id', callId)
+      .eq('source', 'provider_webhook')
+      .order('occurred_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const payload = (ev?.payload ?? {}) as { interaction_id?: string; app_id?: string };
+    const interactionId = payload.interaction_id ?? (call.direction === 'inbound' ? call.provider_call_id : null);
+    if (!interactionId || !payload.app_id) return 'not_applicable';
+    const c = await client(admin);
+    const from = new Date(new Date(call.started_at).getTime() - 15 * 60_000).toISOString();
+    const to = new Date(new Date(call.ended_at ?? call.started_at).getTime() + 60 * 60_000).toISOString();
+    const report = await c.callTool<{ items?: { interaction_id: string; audio_url?: string | null; duration_in_seconds?: number }[] }>('analytics', {
+      operation: 'report',
+      id: 'interactions',
+      params: { start_datetime: from, end_datetime: to, app_id: payload.app_id },
+    });
+    const hit = (report.items ?? []).find((i) => i.interaction_id === interactionId);
+    if (!hit?.audio_url || !/^https:\/\//.test(hit.audio_url)) return 'not_available';
+    const { error } = await admin.from('call_recordings').insert({
+      call_id: callId,
+      source: 'provider',
+      provider_recording_url: hit.audio_url.slice(0, 4000),
+      provider_recording_id: interactionId.slice(0, 200),
+      duration_seconds: hit.duration_in_seconds ? Math.round(hit.duration_in_seconds) : null,
+    });
+    if (error && error.code !== '23505') throw error;
+    await admin.from('call_events').insert({ call_id: callId, event_type: 'recording_fetched', source: 'system', payload: { interaction_id: interactionId } });
+    return 'attached';
+  },
+
+  /** Background sweep: recent answered Sarvam calls without a recording (bounded). */
+  async sweepRecordings(admin: DB, limit = 5): Promise<number> {
+    const since = new Date(Date.now() - 7 * 86400_000).toISOString();
+    const { data } = await admin
+      .from('call_log_view')
+      .select('id')
+      .eq('provider', 'sarvam')
+      .eq('has_recording', false)
+      .not('answered_at', 'is', null)
+      .gte('started_at', since)
+      .order('started_at', { ascending: false })
+      .limit(limit);
+    let attached = 0;
+    for (const r of data ?? []) {
+      try {
+        if ((await this.fetchRecording(admin, r.id!)) === 'attached') attached++;
+      } catch (e) {
+        console.error('[sarvam] recording sweep', e);
+        break;
+      }
+    }
+    return attached;
+  },
 };
+

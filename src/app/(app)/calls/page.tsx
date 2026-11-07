@@ -10,6 +10,7 @@ import { Pagination } from '@/components/ui/pagination';
 import { buttonClass } from '@/components/ui/button';
 import { CallsTable } from '@/components/calls/calls-table';
 import { CallFilterBar } from '@/components/calls/call-filters';
+import { scheduleRecordingSweep } from '@/server/recording-sync';
 
 export const metadata: Metadata = { title: 'Call Logs' };
 
@@ -17,6 +18,7 @@ export default async function CallLogsPage(props: PageProps<'/calls'>) {
   const { db } = await requireMember();
   const params = flatParams(await props.searchParams);
   const [{ rows, total, page, filters }, campaigns] = await Promise.all([listCalls(db, params), campaignOptions(db)]);
+  scheduleRecordingSweep();
   const exportQs = new URLSearchParams(Object.entries(params).filter(([k, v]) => v && k !== 'page') as [string, string][]).toString();
   return (
     <>

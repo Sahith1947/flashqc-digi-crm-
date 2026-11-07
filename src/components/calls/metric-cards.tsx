@@ -8,7 +8,7 @@ export function MetricCards({ s }: { s: Summary }) {
   const n = (v: number) => v.toLocaleString('en-IN');
   return (
     <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4" data-testid="metric-cards">
-      <StatCard label="Total calls" value={n(s.total)} icon={<Phone className="size-4" />} hint={s.simulated ? `${n(s.simulated)} simulated` : 'All recorded calls'} />
+      <StatCard label="Total calls" value={n(s.total)} icon={<Phone className="size-4" />} hint={[s.simulated ? `${n(s.simulated)} simulated` : null, s.queued ? `${n(s.queued)} scheduled (not dialled yet)` : null].filter(Boolean).join(' · ') || 'Calls that took place'} />
       <StatCard label="Incoming" value={n(s.inbound)} icon={<PhoneIncoming className="size-4" />} hint={`${pct(s.inbound, s.total)} of calls`} />
       <StatCard label="Outgoing" value={n(s.outbound)} icon={<PhoneOutgoing className="size-4" />} hint={`${pct(s.outbound, s.total)} of calls`} />
       <StatCard label="Answered" value={n(s.answered)} icon={<CheckCircle2 className="size-4" />} hint={`${pct(s.answered, s.total)} answer rate`} />

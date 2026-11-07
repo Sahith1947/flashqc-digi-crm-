@@ -16,7 +16,11 @@ import { SortTh, Table, TableWrap, Td, Th, Tr } from '@/components/ui/table';
 import { buttonClass, LinkButton } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ContactFormButton } from '@/components/contacts/contact-form';
+import { ActionButton } from '@/components/config/sarvam-connect';
+import { backfillLeadsFromCalls } from './actions';
 import { ConsentBadge, DndBadge } from '@/components/contacts/contact-badges';
+import { EmotionBadge, LeadStageBadge, TemperatureBadge } from '@/components/contacts/lead-badges';
+import { LEAD_STAGE_LABELS, LEAD_STAGES } from '@/lib/leads';
 
 export const metadata: Metadata = { title: 'Contacts' };
 
@@ -42,6 +46,7 @@ export default async function ContactsPage(props: PageProps<'/contacts'>) {
                 Import CSV
               </LinkButton>
             )}
+            {hasMinRole(profile.role, 'admin') && <ActionButton action={backfillLeadsFromCalls} label="Create leads from past AI calls" testId="backfill-leads" />}
             {canAgent && <ContactFormButton />}
           </>
         }
@@ -53,6 +58,8 @@ export default async function ContactsPage(props: PageProps<'/contacts'>) {
             search={{ value: filters.q, placeholder: 'Name, phone, business or notes' }}
             hidden={{ sort: params.sort, dir: params.dir }}
             selects={[
+              { name: 'stage', label: 'Lead stage', anyLabel: 'All stages', value: filters.stage, options: LEAD_STAGES.map((s) => ({ value: s, label: LEAD_STAGE_LABELS[s] })) },
+              { name: 'temperature', label: 'Temperature', anyLabel: 'Any temperature', value: filters.temperature, options: [{ value: 'hot', label: 'Hot' }, { value: 'warm', label: 'Warm' }, { value: 'cold', label: 'Cold' }] },
               { name: 'city', label: 'City', anyLabel: 'All cities', value: filters.city, options: facets.cities.map((c) => ({ value: c, label: c })) },
               { name: 'category', label: 'Category', anyLabel: 'All categories', value: filters.category, options: facets.categories.map((c) => ({ value: c, label: c })) },
               { name: 'source', label: 'Source', anyLabel: 'All sources', value: filters.source, options: facets.sources.map((c) => ({ value: c, label: c })) },
@@ -65,13 +72,16 @@ export default async function ContactsPage(props: PageProps<'/contacts'>) {
         {rows.length ? (
           <>
             <TableWrap>
-              <Table data-testid="contacts-table" className="min-w-[1000px]">
+              <Table data-testid="contacts-table" className="min-w-[1240px]">
                 <thead>
                   <tr>
                     <SortTh label="Name" column="full_name" {...sortProps} />
                     <Th>Phone</Th>
                     <Th>Business</Th>
                     <SortTh label="City" column="city" {...sortProps} />
+                    <Th>Lead stage</Th>
+                    <Th>Temp.</Th>
+                    <Th>Emotion</Th>
                     <Th>Consent</Th>
                     <Th>DND</Th>
                     <SortTh label="Calls" column="total_calls" {...sortProps} />
@@ -99,6 +109,15 @@ export default async function ContactsPage(props: PageProps<'/contacts'>) {
                         {c.business_category && <p className="text-xs text-ink-3">{c.business_category}</p>}
                       </Td>
                       <Td>{c.city || '—'}</Td>
+                      <Td>
+                        <LeadStageBadge stage={c.lead_stage} />
+                      </Td>
+                      <Td>
+                        <TemperatureBadge temperature={c.lead_temperature} />
+                      </Td>
+                      <Td>
+                        <EmotionBadge emotion={c.last_emotion} />
+                      </Td>
                       <Td>
                         <ConsentBadge status={c.consent_status} />
                       </Td>

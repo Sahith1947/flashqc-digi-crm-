@@ -16,6 +16,8 @@ import { ConfirmAction } from '@/components/ui/confirm-action';
 import { CallsTable } from '@/components/calls/calls-table';
 import { ContactFormButton } from '@/components/contacts/contact-form';
 import { ConsentBadge, DndBadge } from '@/components/contacts/contact-badges';
+import { EmotionBadge, LeadStageBadge, TemperatureBadge } from '@/components/contacts/lead-badges';
+import { LeadStageSelect } from '@/components/contacts/lead-stage-select';
 import { deleteContact, setSuppression } from '../actions';
 
 export const metadata: Metadata = { title: 'Contact' };
@@ -94,6 +96,35 @@ export default async function ContactDetailPage(props: PageProps<'/contacts/[id]
           {contact.is_suppressed ? 'the number is on the suppression list.' : contact.consent_status === 'revoked' ? 'consent was revoked.' : 'the number is on DND with no recorded consent.'}
         </Notice>
       )}
+      <Card className="mb-6">
+        <CardHeader title="Lead" description={contact.lead_updated_at ? `Updated ${formatDateTime(contact.lead_updated_at)} · stage and emotion update automatically after each AI call` : 'Stage and emotion update automatically after each AI call'} />
+        <CardBody className="space-y-4">
+          <div className="flex flex-wrap items-center gap-x-8 gap-y-3 text-sm" data-testid="lead-panel">
+            <div className="flex items-center gap-2">
+              <span className="text-ink-3">Stage</span>
+              {canAgent ? <LeadStageSelect contactId={id} stage={contact.lead_stage ?? 'new'} /> : <LeadStageBadge stage={contact.lead_stage} />}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-ink-3">Temperature</span>
+              <TemperatureBadge temperature={contact.lead_temperature} />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-ink-3">Last emotion</span>
+              <EmotionBadge emotion={contact.last_emotion} />
+            </div>
+          </div>
+          {contact.lead_details && Object.keys(contact.lead_details as object).length > 0 && (
+            <dl className="grid gap-x-8 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
+              {Object.entries(contact.lead_details as Record<string, string>).map(([k, v]) => (
+                <div key={k} className="rounded-lg bg-canvas px-3 py-2">
+                  <dt className="text-xs text-ink-3">{k}</dt>
+                  <dd className="font-medium capitalize">{v}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
+        </CardBody>
+      </Card>
       <div className="grid gap-6 xl:grid-cols-3">
         <Card>
           <CardHeader title="Details" />

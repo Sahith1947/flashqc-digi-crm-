@@ -1,9 +1,10 @@
 import 'server-only';
 import { z } from 'zod';
-import type { Json, TablesInsert } from '@/lib/supabase/database.types';
+import type { Json, TablesInsert, TablesUpdate } from '@/lib/supabase/database.types';
 import type { DB } from '@/lib/supabase/types';
 import type { CallOutcome, CallStatus } from '@/lib/constants';
 import { normalizePhone } from '@/lib/phone';
+import { detectEmotion, nextStage, stageFromCall, type LeadStage } from '@/lib/leads';
 
 // Turns Sarvam call-end webhooks (sarvam://schemas/webhook-payload) into CRM records.
 // Called only after the shared secret was verified; always with the backend client,
@@ -116,6 +117,12 @@ async function attachConversation(admin: DB, callId: string, p: Outbound | Inbou
       .upsert({ call_id: callId, content, segments: turns as unknown as Json, source: 'provider', provider: 'sarvam' }, { onConflict: 'call_id' });
     if (error) throw error;
   }
+  const emotion = detectEmotion({
+    connected,
+    temperature: str(vars.lead_temperature),
+    outcome: str(vars.consultation_outcome),
+    customerText: turns.filter((t) => t.role !== 'agent').map((t) => t.en_text || t.indic_text || '').join(' \n '),
+  });
   const summary = str(vars.call_summary);
   if (connected && summary) {
     const keyPoints = Object.entries(LEAD_LABELS)
@@ -127,7 +134,8 @@ async function attachConversation(admin: DB, callId: string, p: Outbound | Inbou
         call_id: callId,
         summary: summary.slice(0, 20000),
         key_points: keyPoints as unknown as Json,
-        sentiment: temp === 'HOT' ? 'positive' : temp === 'COLD' ? 'negative' : temp === 'WARM' ? 'neutral' : null,
+        sentiment: emotion?.sentiment ?? (temp === 'HOT' ? 'positive' : temp === 'COLD' ? 'negative' : temp === 'WARM' ? 'neutral' : null),
+        emotion: emotion?.label ?? null,
         suggested_outcome: str(vars.consultation_outcome) || null,
         source: 'ai',
         model: `sarvam:${p.app_id}${p.app_version ? `@v${p.app_version}` : ''}`,
@@ -156,7 +164,77 @@ async function attachConversation(admin: DB, callId: string, p: Outbound | Inbou
     // Only fill the outcome if a person has not set one already.
     await admin.from('calls').update({ outcome }).eq('id', callId).is('outcome', null);
   }
-  return outcome ?? null;
+  return { outcome: outcome ?? null, emotion };
+}
+
+/**
+ * Creates the lead for a new caller (connected calls only) or updates the existing contact:
+ * stage (forward-only), temperature, emotion, AI lead details, and blank profile fields from
+ * what the agent captured. Returns the contact id.
+ */
+async function upsertLead(
+  admin: DB,
+  callId: string,
+  phone: string,
+  contactId: string | null,
+  p: Outbound | Inbound,
+  connected: boolean,
+  emotion: ReturnType<typeof detectEmotion>,
+  source: string,
+): Promise<string | null> {
+  const vars = variables(p);
+  const v = (k: string) => {
+    const x = str(vars[k]);
+    return x && !/^(not_shared|none|unknown|n\/a)$/i.test(x) ? x : null;
+  };
+  let id = contactId;
+  if (!id) {
+    if (!connected) return null;
+    const { data, error } = await admin
+      .from('contacts')
+      .insert({
+        phone_e164: phone,
+        full_name: v('user_name')?.slice(0, 200) ?? null,
+        business_name: v('business_name')?.slice(0, 200) ?? null,
+        business_category: v('business_category')?.slice(0, 120) ?? null,
+        city: v('location')?.slice(0, 120) ?? null,
+        source,
+      })
+      .select('id')
+      .single();
+    if (error && error.code !== '23505') throw error;
+    id = data?.id ?? (await admin.from('contacts').select('id').eq('phone_e164', phone).maybeSingle()).data?.id ?? null;
+    if (!id) return null;
+    await admin.from('calls').update({ contact_id: id }).eq('id', callId).is('contact_id', null);
+  }
+  const { data: c } = await admin
+    .from('contacts')
+    .select('full_name, business_name, business_category, city, lead_stage, lead_details')
+    .eq('id', id)
+    .maybeSingle();
+  if (!c) return id;
+  const temp = (v('lead_temperature') ?? '').toLowerCase();
+  const suggested = stageFromCall({ connected, outcome: v('consultation_outcome'), temperature: temp });
+  const stage = nextStage((c.lead_stage as LeadStage) ?? 'new', suggested);
+  const details: Record<string, string> = { ...((c.lead_details as Record<string, string> | null) ?? {}) };
+  for (const [k, label] of Object.entries(LEAD_LABELS)) {
+    const val = v(k);
+    if (val) details[label] = val.replace(/_/g, ' ');
+  }
+  const patch: TablesUpdate<'contacts'> = { lead_stage: stage };
+  if (connected) {
+    patch.lead_updated_at = new Date().toISOString();
+    patch.lead_details = details as Json;
+    if (temp === 'hot' || temp === 'warm' || temp === 'cold') patch.lead_temperature = temp;
+    if (emotion) patch.last_emotion = emotion.label;
+    if (!c.full_name && v('user_name')) patch.full_name = v('user_name')!.slice(0, 200);
+    if (!c.business_name && v('business_name')) patch.business_name = v('business_name')!.slice(0, 200);
+    if (!c.business_category && v('business_category')) patch.business_category = v('business_category')!.slice(0, 120);
+    if (!c.city && v('location')) patch.city = v('location')!.slice(0, 120);
+  }
+  const { error } = await admin.from('contacts').update(patch).eq('id', id);
+  if (error) throw error;
+  return id;
 }
 
 async function recordEvent(admin: DB, callId: string, type: string, status: string | null, at: string | null, payload: Record<string, unknown>) {
@@ -255,7 +333,8 @@ export const SarvamWebhookService = {
     }
 
     await recordEvent(admin, callId, connected ? 'completed' : status, status, endedAt, p as unknown as Record<string, unknown>);
-    const outcome = await attachConversation(admin, callId, p, connected);
+    const { outcome, emotion } = await attachConversation(admin, callId, p, connected);
+    await upsertLead(admin, callId, look.phone, look.contactId, p, connected, emotion, 'live_call');
 
     if (campaignContactId) {
       const terminal = !p.next_action_status;
@@ -307,8 +386,50 @@ export const SarvamWebhookService = {
       callId = data.id;
     }
     await recordEvent(admin, callId, 'completed', 'completed', endedAt, p as unknown as Record<string, unknown>);
-    await attachConversation(admin, callId, p, true);
+    const { emotion } = await attachConversation(admin, callId, p, true);
+    await upsertLead(admin, callId, look.phone, look.contactId, p, true, emotion, 'inbound_call');
     return { callId, status: 'completed' as const };
+  },
+
+  /** Rebuilds leads and emotion from past Sarvam calls (their stored webhook payloads), oldest first. */
+  async backfillLeads(admin: DB): Promise<{ calls: number; created: number }> {
+    const { count: before } = await admin.from('contacts').select('id', { count: 'exact', head: true });
+    const { data: calls } = await admin
+      .from('calls')
+      .select('id, phone_e164, contact_id, answered_at, direction')
+      .eq('provider', 'sarvam')
+      .eq('is_simulated', false)
+      .neq('status', 'queued')
+      .order('started_at', { ascending: true })
+      .limit(2000);
+    let processed = 0;
+    for (const call of calls ?? []) {
+      const { data: ev } = await admin
+        .from('call_events')
+        .select('payload')
+        .eq('call_id', call.id)
+        .eq('source', 'provider_webhook')
+        .order('occurred_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!ev?.payload) continue;
+      const p = ev.payload as unknown as Outbound & Inbound;
+      const connected = Boolean(call.answered_at);
+      const { data: tr } = await admin.from('call_transcripts').select('segments').eq('call_id', call.id).maybeSingle();
+      const turns = (Array.isArray(tr?.segments) ? tr!.segments : []) as { role: string; en_text?: string; indic_text?: string }[];
+      const vars = variables(p);
+      const emotion = detectEmotion({
+        connected,
+        temperature: str(vars.lead_temperature),
+        outcome: str(vars.consultation_outcome),
+        customerText: turns.filter((t) => t.role !== 'agent').map((t) => t.en_text || t.indic_text || '').join(' \n '),
+      });
+      if (emotion) await admin.from('call_summaries').update({ emotion: emotion.label, sentiment: emotion.sentiment }).eq('call_id', call.id);
+      await upsertLead(admin, call.id, call.phone_e164, call.contact_id, p, connected, emotion, call.direction === 'inbound' ? 'inbound_call' : 'live_call');
+      processed++;
+    }
+    const { count: after } = await admin.from('contacts').select('id', { count: 'exact', head: true });
+    return { calls: processed, created: Math.max(0, (after ?? 0) - (before ?? 0)) };
   },
 
   async handle(admin: DB, body: unknown) {

@@ -18,6 +18,7 @@ import { StackedColumns } from '@/components/charts/stacked-columns';
 import { LineChart } from '@/components/charts/line-chart';
 import { BarList } from '@/components/charts/bar-list';
 import { LinkButton } from '@/components/ui/button';
+import { LEAD_STAGE_LABELS, LEAD_STAGE_TONE, LEAD_STAGES } from '@/lib/leads';
 
 export const metadata: Metadata = { title: 'Overview' };
 
@@ -53,6 +54,13 @@ export default async function OverviewPage(props: PageProps<'/'>) {
     db.from('campaigns').select('id, name, status, mode, created_at').order('created_at', { ascending: false }).limit(5),
   ]);
   if (recentCalls.error) throw recentCalls.error;
+  const { data: leadRows } = await db.from('contacts').select('lead_stage, lead_temperature').limit(20000);
+  const stageCount = new Map<string, number>();
+  const tempCount = new Map<string, number>();
+  for (const r of leadRows ?? []) {
+    stageCount.set(r.lead_stage, (stageCount.get(r.lead_stage) ?? 0) + 1);
+    if (r.lead_temperature) tempCount.set(r.lead_temperature, (tempCount.get(r.lead_temperature) ?? 0) + 1);
+  }
   if (recentCampaigns.error) throw recentCampaigns.error;
   const statsRes = recentCampaigns.data.length
     ? await db.from('campaign_stats').select('*').in('campaign_id', recentCampaigns.data.map((c) => c.id))
@@ -133,6 +141,37 @@ export default async function OverviewPage(props: PageProps<'/'>) {
                 { key: 'inbound', label: 'Inbound', value: summary.inbound, tone: 'info' },
                 { key: 'outbound', label: 'Outbound', value: summary.outbound, tone: 'brand' },
               ]}
+            />
+          </CardBody>
+        </Card>
+      </div>
+
+      <div className="mt-6 grid gap-6 xl:grid-cols-3">
+        <Card className="xl:col-span-2">
+          <CardHeader
+            title="Leads pipeline"
+            description="All contacts by stage · updated automatically after each AI call"
+            action={<LinkButton href="/contacts" variant="ghost" size="sm">Contacts <ArrowRight className="size-3.5" /></LinkButton>}
+          />
+          <CardBody>
+            <div data-testid="leads-pipeline">
+              <BarList
+                items={LEAD_STAGES.map((s) => ({ key: s, label: LEAD_STAGE_LABELS[s], value: stageCount.get(s) ?? 0, tone: LEAD_STAGE_TONE[s] === 'brand' ? ('brand' as const) : LEAD_STAGE_TONE[s] }))}
+                emptyText="No contacts yet. Leads are created automatically when someone talks to your AI agent."
+              />
+            </div>
+          </CardBody>
+        </Card>
+        <Card>
+          <CardHeader title="Lead temperature" description="From the AI's post-call analysis" />
+          <CardBody>
+            <BarList
+              items={[
+                { key: 'hot', label: 'Hot', value: tempCount.get('hot') ?? 0, tone: 'critical' as const },
+                { key: 'warm', label: 'Warm', value: tempCount.get('warm') ?? 0, tone: 'warning' as const },
+                { key: 'cold', label: 'Cold', value: tempCount.get('cold') ?? 0, tone: 'info' as const },
+              ]}
+              emptyText="No AI-rated leads yet."
             />
           </CardBody>
         </Card>

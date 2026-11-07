@@ -117,14 +117,14 @@ isOneToOne: false
                   ]
                 },"call_summaries": {
                   Row: {
-                    "call_id": string,"created_at": string,"created_by": string | null,"id": string,"key_points": Json | null,"model": string | null,"sentiment": string | null,"source": string,"suggested_outcome": string | null,"summary": string,"updated_at": string
+                    "call_id": string,"created_at": string,"created_by": string | null,"emotion": string | null,"id": string,"key_points": Json | null,"model": string | null,"sentiment": string | null,"source": string,"suggested_outcome": string | null,"summary": string,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "call_id": string,"created_at"?: string,"created_by"?: string | null,"id"?: string,"key_points"?: Json | null,"model"?: string | null,"sentiment"?: string | null,"source": string,"suggested_outcome"?: string | null,"summary": string,"updated_at"?: string
+                    "call_id": string,"created_at"?: string,"created_by"?: string | null,"emotion"?: string | null,"id"?: string,"key_points"?: Json | null,"model"?: string | null,"sentiment"?: string | null,"source": string,"suggested_outcome"?: string | null,"summary": string,"updated_at"?: string
                   }
                   Update: {
-                    "call_id"?: string,"created_at"?: string,"created_by"?: string | null,"id"?: string,"key_points"?: Json | null,"model"?: string | null,"sentiment"?: string | null,"source"?: string,"suggested_outcome"?: string | null,"summary"?: string,"updated_at"?: string
+                    "call_id"?: string,"created_at"?: string,"created_by"?: string | null,"emotion"?: string | null,"id"?: string,"key_points"?: Json | null,"model"?: string | null,"sentiment"?: string | null,"source"?: string,"suggested_outcome"?: string | null,"summary"?: string,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -319,14 +319,14 @@ isOneToOne: false
                   ]
                 },"contacts": {
                   Row: {
-                    "business_category": string | null,"business_name": string | null,"city": string | null,"consent_status": string,"created_at": string,"created_by": string | null,"dnd_status": string,"full_name": string | null,"id": string,"notes": string | null,"phone_e164": string,"source": string,"updated_at": string
+                    "business_category": string | null,"business_name": string | null,"city": string | null,"consent_status": string,"created_at": string,"created_by": string | null,"dnd_status": string,"full_name": string | null,"id": string,"last_emotion": string | null,"lead_details": Json | null,"lead_stage": string,"lead_temperature": string | null,"lead_updated_at": string | null,"notes": string | null,"phone_e164": string,"source": string,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "business_category"?: string | null,"business_name"?: string | null,"city"?: string | null,"consent_status"?: string,"created_at"?: string,"created_by"?: string | null,"dnd_status"?: string,"full_name"?: string | null,"id"?: string,"notes"?: string | null,"phone_e164": string,"source"?: string,"updated_at"?: string
+                    "business_category"?: string | null,"business_name"?: string | null,"city"?: string | null,"consent_status"?: string,"created_at"?: string,"created_by"?: string | null,"dnd_status"?: string,"full_name"?: string | null,"id"?: string,"last_emotion"?: string | null,"lead_details"?: Json | null,"lead_stage"?: string,"lead_temperature"?: string | null,"lead_updated_at"?: string | null,"notes"?: string | null,"phone_e164": string,"source"?: string,"updated_at"?: string
                   }
                   Update: {
-                    "business_category"?: string | null,"business_name"?: string | null,"city"?: string | null,"consent_status"?: string,"created_at"?: string,"created_by"?: string | null,"dnd_status"?: string,"full_name"?: string | null,"id"?: string,"notes"?: string | null,"phone_e164"?: string,"source"?: string,"updated_at"?: string
+                    "business_category"?: string | null,"business_name"?: string | null,"city"?: string | null,"consent_status"?: string,"created_at"?: string,"created_by"?: string | null,"dnd_status"?: string,"full_name"?: string | null,"id"?: string,"last_emotion"?: string | null,"lead_details"?: Json | null,"lead_stage"?: string,"lead_temperature"?: string | null,"lead_updated_at"?: string | null,"notes"?: string | null,"phone_e164"?: string,"source"?: string,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -508,7 +508,7 @@ isOneToOne: false
                   ]
                 },"contacts_with_stats": {
                   Row: {
-                    "business_category": string | null,"business_name": string | null,"city": string | null,"consent_status": string,"created_at": string,"created_by": string | null,"dnd_status": string,"full_name": string | null,"id": string,"is_suppressed": boolean | null,"last_call_at": string | null,"last_call_outcome": string | null,"last_call_status": string | null,"notes": string | null,"phone_e164": string,"source": string,"total_calls": number | null,"updated_at": string
+                    "business_category": string | null,"business_name": string | null,"city": string | null,"consent_status": string,"created_at": string,"created_by": string | null,"dnd_status": string,"full_name": string | null,"id": string,"is_suppressed": boolean | null,"last_call_at": string | null,"last_call_outcome": string | null,"last_call_status": string | null,"last_emotion": string | null,"lead_details": Json | null,"lead_stage": string,"lead_temperature": string | null,"lead_updated_at": string | null,"notes": string | null,"phone_e164": string,"source": string,"total_calls": number | null,"updated_at": string
                   }
                   ComputedFields: never
                   Relationships: [

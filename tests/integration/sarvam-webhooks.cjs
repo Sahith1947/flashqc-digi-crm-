@@ -56,6 +56,18 @@ const vars = { call_summary: 'Owner of Hotel Paradise agreed to a meeting tomorr
   ok(sql(`select status from campaigns where name='Live pilot'`) === 'completed', 'campaign completes when every contact has a final result');
   ok(sql(`select count(*) from call_transcripts t join calls c on c.id=t.call_id where c.provider_call_id='att-c2-0'`) === '0', 'no transcript invented for unanswered call');
   ok(sql(`select count(*) from call_events where payload::text like '%${SECRET}%'`) === '0', 'webhook secret never stored in call events');
+  // Leads: existing contact (Lakshmi) moved to meeting_booked by the inbound call above
+  ok(sql(`select lead_stage||'|'||lead_temperature||'|'||last_emotion from contacts where full_name='Lakshmi'`) === 'meeting_booked|hot|Excited', 'existing contact lead updated (stage, temperature, emotion)');
+  ok(sql(`select emotion from call_summaries s join calls c on c.id=s.call_id where c.provider_call_id='int-inbound-1'`) === 'Excited', 'emotion stored on call summary');
+  // Unknown caller becomes a new lead with captured profile
+  [s] = await post({ deployment_id: 'FlashQC-Dig-1eb66f90-b322', app_id: 'Conversatio-ef4d6b32-0d9b', interaction_id: 'int-new-lead', user_phone_number: '+919700011122', agent_phone_number: '+917965482329', duration: 80, start_datetime: '2026-11-08T09:00:00Z', end_datetime: '2026-11-08T09:01:20Z', interaction_transcript: [{ role: 'agent', en_text: 'Hello' }, { role: 'user', en_text: 'I want more customers for my bakery, sounds good' }], final_agent_variables: { user_name: 'Suresh', business_name: 'Sri Bakery', business_category: 'Bakery', location: 'Warangal', call_summary: 'Bakery owner wants WhatsApp details.', consultation_outcome: 'whatsapp_details_requested', lead_temperature: 'WARM', monthly_budget: 'not_shared' } });
+  ok(s === 200 && sql(`select full_name||'|'||business_name||'|'||city||'|'||source||'|'||lead_stage||'|'||lead_temperature||'|'||last_emotion from contacts where phone_e164='+919700011122'`) === 'Suresh|Sri Bakery|Warangal|inbound_call|interested|warm|Interested', 'unknown caller auto-created as lead with profile, stage, emotion');
+  ok(sql(`select (contact_id is not null)::text from calls where provider_call_id='int-new-lead'`) === 'true', 'call linked to the new lead');
+  ok(sql(`select (lead_details ? 'Monthly budget')::text from contacts where phone_e164='+919700011122'`) === 'false', '"not_shared" values are not stored as lead details');
+  // Later "not interested" does not undo a booked meeting; annoyed language detected
+  [s] = await post({ deployment_id: 'FlashQC-Dig-1eb66f90-b322', app_id: 'Conversatio-ef4d6b32-0d9b', interaction_id: 'int-lak-2', user_phone_number: '+919848054321', agent_phone_number: '+917965482329', duration: 30, start_datetime: '2026-11-08T10:00:00Z', end_datetime: '2026-11-08T10:00:30Z', interaction_transcript: [{ role: 'user', en_text: 'Please stop calling me' }], final_agent_variables: { call_summary: 'Asked not to be called.', consultation_outcome: 'not_interested', lead_temperature: 'COLD' } });
+  ok(sql(`select lead_stage||'|'||last_emotion from contacts where full_name='Lakshmi'`) === 'meeting_booked|Annoyed', 'stage protected; annoyed emotion detected');
+  ok(sql(`select count(*) from contacts`) === '3', 'no duplicate contacts created');
   [s] = await post({ foo: 'bar' }); ok(s === 500, `unknown payload rejected (${s})`);
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
