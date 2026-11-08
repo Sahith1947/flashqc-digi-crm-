@@ -14,14 +14,19 @@ export interface SessionContext {
   profile: Profile | null;
 }
 
-/** Cached per request. Verifies the user with the auth server. */
+/**
+ * Cached per request. Verifies the signed-in user from the session token's signature (asymmetric
+ * signing keys, checked locally with Supabase's cached public keys), so a page does not wait on an
+ * extra round trip to the auth server. Deactivated users are still blocked by their profile row.
+ */
 export const getSession = cache(async (): Promise<SessionContext | null> => {
   await connection(); // per-request, never prerendered
   const db = await createClient();
-  const { data, error } = await db.auth.getUser();
-  if (error || !data.user) return null;
-  const { data: profile } = await db.from('profiles').select('*').eq('id', data.user.id).maybeSingle();
-  return { db, userId: data.user.id, email: data.user.email ?? '', profile };
+  const { data, error } = await db.auth.getClaims();
+  const sub = data?.claims?.sub;
+  if (error || !sub) return null;
+  const { data: profile } = await db.from('profiles').select('*').eq('id', sub).maybeSingle();
+  return { db, userId: sub, email: (data.claims.email as string | undefined) ?? profile?.email ?? '', profile };
 });
 
 /** For pages: redirects to /login or /pending as needed. */
