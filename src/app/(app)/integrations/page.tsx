@@ -70,27 +70,33 @@ const ENV_VARS: Record<string, string[]> = {
 };
 
 export default async function IntegrationsPage(props: PageProps<'/integrations'>) {
-  const showVobiz = (await props.searchParams).vobiz === '1';
-  const { db, profile } = await requireMember();
-  const { data, error } = await db.from('integrations').select('*').order('created_at');
-  if (error) throw error;
+  const [{ vobiz: vobizParam }, { db, profile }] = await Promise.all([props.searchParams, requireMember()]);
+  const showVobiz = vobizParam === '1';
   const env = credentialPresence();
   const ready = integrationReadiness();
   const isAdmin = hasMinRole(profile.role, 'admin');
   const canManage = hasMinRole(profile.role, 'manager');
   const admin = createAdminClient();
-  const sarvam = admin && env.INTEGRATION_ENCRYPTION_KEY ? await SarvamAuth.status(admin) : null;
-  const live = await TelephonyService.liveStatus();
-  const { data: appSettings } = await db.from('app_settings').select('sarvam_inbound_webhook_at').maybeSingle();
+  const secure = Boolean(admin && env.INTEGRATION_ENCRYPTION_KEY);
+  // Independent lookups run together, so the page waits for the slowest one only.
+  const [integrationsRes, sarvam, live, settingsRes, vobiz, recs, recCounts] = await Promise.all([
+    db.from('integrations').select('*').order('created_at'),
+    secure ? SarvamAuth.status(admin!) : Promise.resolve(null),
+    TelephonyService.liveStatus(),
+    db.from('app_settings').select('sarvam_inbound_webhook_at').maybeSingle(),
+    secure ? VobizService.status(admin!) : Promise.resolve(null),
+    secure ? SarvamRecordings.status(admin!) : Promise.resolve(null),
+    secure ? SarvamRecordings.counts(admin!) : Promise.resolve(null),
+  ]);
+  const { data, error } = integrationsRes;
+  if (error) throw error;
+  const appSettings = settingsRes.data;
   const inboundSync = Boolean(appSettings?.sarvam_inbound_webhook_at);
   const flags = {
     live: live.available,
     inbound: inboundSync,
     recordings: live.available || inboundSync,
   };
-  const vobiz = admin && env.INTEGRATION_ENCRYPTION_KEY ? await VobizService.status(admin) : null;
-  const recs = admin && env.INTEGRATION_ENCRYPTION_KEY ? await SarvamRecordings.status(admin) : null;
-  const recCounts = admin && recs?.configured ? await SarvamRecordings.counts(admin) : null;
   const h = await headers();
   const origin = `${h.get('x-forwarded-proto') ?? 'http'}://${h.get('host') ?? 'localhost:3000'}`;
 

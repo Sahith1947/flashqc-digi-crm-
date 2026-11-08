@@ -26,12 +26,13 @@ export default async function InboundPage(props: PageProps<'/inbound'>) {
   const { db, profile } = await requireMember();
   const params = flatParams(await props.searchParams);
   const since = isoDaysAgo(14);
-  const [list, campaigns, lines, settings, missedRes] = await Promise.all([
+  const [list, campaigns, lines, settings, missedRes, liveRes] = await Promise.all([
     listCalls(db, params, { direction: 'inbound' }),
     campaignOptions(db),
     lineOptions(db, 'inbound'),
     getSettings(db),
     db.from('call_log_view').select('id, phone_e164, contact_name, started_at, is_simulated').eq('direction', 'inbound').eq('status', 'missed').gte('started_at', since).order('started_at', { ascending: false }).limit(50),
+    TelephonyService.liveStatus(),
   ]);
   if (missedRes.error) throw missedRes.error;
 
@@ -52,7 +53,7 @@ export default async function InboundPage(props: PageProps<'/inbound'>) {
       return !a || a < m.started_at!;
     });
   }
-  const liveAvailable = (await TelephonyService.liveStatus()).available;
+  const liveAvailable = liveRes.available;
 
   return (
     <>

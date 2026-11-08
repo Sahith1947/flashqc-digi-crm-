@@ -106,8 +106,7 @@ async function saveTokens(admin: DB, tok: Record<string, unknown>, clientId: str
 export const SarvamAuth = {
   /** Non-secret connection facts for the UI. */
   async status(admin: DB) {
-    const row = await readRow(admin, CREDS_KEY);
-    const pending = await readRow(admin, PENDING_KEY);
+    const [row, pending] = await Promise.all([readRow(admin, CREDS_KEY), readRow(admin, PENDING_KEY)]);
     const pendingMeta = (pending?.metadata ?? null) as { user_code?: string; verify_url?: string; started_at?: number } | null;
     const pendingFresh = pendingMeta?.started_at && Date.now() - pendingMeta.started_at < 14 * 60 * 1000;
     return {

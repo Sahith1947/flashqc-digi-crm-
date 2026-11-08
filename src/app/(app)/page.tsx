@@ -41,7 +41,7 @@ export default async function OverviewPage(props: PageProps<'/'>) {
   const dailyGranularity = days > 92 ? 'week' : 'day';
   const tw = trailingWindow(trend);
 
-  const [summary, daily, trends, recentCalls, recentCampaigns] = await Promise.all([
+  const [summary, daily, trends, recentCalls, recentCampaigns, leadRes] = await Promise.all([
     getSummary(db, range.from, range.to, scope),
     getTrends(db, range.from, range.to, dailyGranularity, scope),
     getTrends(db, tw.from, tw.to, trend, scope),
@@ -52,9 +52,10 @@ export default async function OverviewPage(props: PageProps<'/'>) {
       return q;
     })(),
     db.from('campaigns').select('id, name, status, mode, created_at').order('created_at', { ascending: false }).limit(5),
+    db.from('contacts').select('lead_stage, lead_temperature').limit(20000),
   ]);
   if (recentCalls.error) throw recentCalls.error;
-  const { data: leadRows } = await db.from('contacts').select('lead_stage, lead_temperature').limit(20000);
+  const leadRows = leadRes.data;
   const stageCount = new Map<string, number>();
   const tempCount = new Map<string, number>();
   for (const r of leadRows ?? []) {

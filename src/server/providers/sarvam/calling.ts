@@ -77,17 +77,20 @@ export const SarvamCalling = {
 
   /** Everything a live call needs, or the plain-language reason it cannot happen yet. */
   async readiness(admin: DB, opts: { voiceAgentId?: string | null; phoneNumberId?: string | null } = {}): Promise<Readiness> {
-    if (!(await SarvamAuth.status(admin)).connected) return { ok: false, reason: 'Sarvam is not connected (Integrations → Connect Sarvam).' };
-    const baseUrl = serverEnv.publicBaseUrl;
-    if (!baseUrl) return { ok: false, reason: 'Live calls run on the deployed site (call results need a public web address).' };
-
     let aq = admin
       .from('voice_agents')
       .select('id, name, provider_agent_id, provider_committed_version, status, connection_status')
       .eq('provider', 'sarvam')
       .not('provider_agent_id', 'is', null);
     if (opts.voiceAgentId) aq = aq.eq('id', opts.voiceAgentId);
-    const { data: agents } = await aq.order('created_at');
+    let lq = admin.from('phone_numbers').select('id, phone_e164, provider_connection_id, can_outbound, enabled').not('provider_connection_id', 'is', null);
+    if (opts.phoneNumberId) lq = lq.eq('id', opts.phoneNumberId);
+    // The three lookups are independent: run them together.
+    const [auth, { data: agents }, { data: lines }] = await Promise.all([SarvamAuth.status(admin), aq.order('created_at'), lq.order('created_at')]);
+    if (!auth.connected) return { ok: false, reason: 'Sarvam is not connected (Integrations → Connect Sarvam).' };
+    const baseUrl = serverEnv.publicBaseUrl;
+    if (!baseUrl) return { ok: false, reason: 'Live calls run on the deployed site (call results need a public web address).' };
+
     const agent = (agents ?? []).find((a) => a.connection_status === 'connected' && a.status !== 'disabled' && a.provider_committed_version);
     if (!agent) {
       return {
@@ -98,9 +101,6 @@ export const SarvamCalling = {
       };
     }
 
-    let lq = admin.from('phone_numbers').select('id, phone_e164, provider_connection_id, can_outbound, enabled').not('provider_connection_id', 'is', null);
-    if (opts.phoneNumberId) lq = lq.eq('id', opts.phoneNumberId);
-    const { data: lines } = await lq.order('created_at');
     const line = (lines ?? []).find((l) => l.enabled && l.can_outbound);
     if (!line) {
       return {

@@ -52,7 +52,7 @@ export default async function CampaignDetailPage(props: PageProps<'/campaigns/[i
   if (ccStatus) ccq = ccq.eq('contact_status', ccStatus);
   if (interest) ccq = ccq.eq('interest', interest);
   const canManage = hasMinRole(profile.role, 'manager');
-  const [statsRes, ccRes, outcomesRes, lines, agents, facets, interestRes] = await Promise.all([
+  const [statsRes, ccRes, outcomesRes, lines, agents, facets, interestRes, liveRes] = await Promise.all([
     db.from('campaign_stats').select('*').eq('campaign_id', id).maybeSingle(),
     ccq.order('created_at').order('campaign_contact_id').range((page - 1) * PAGE, page * PAGE - 1),
     db.from('calls').select('outcome').eq('campaign_id', id).not('answered_at', 'is', null).limit(10000),
@@ -60,6 +60,7 @@ export default async function CampaignDetailPage(props: PageProps<'/campaigns/[i
     canManage ? agentOptions(db) : Promise.resolve([]),
     canManage ? contactFacets(db) : Promise.resolve({ cities: [], categories: [], sources: [] }),
     db.from('campaign_results_view').select('interest').eq('campaign_id', id).limit(20000),
+    TelephonyService.liveStatus(),
   ]);
   const interestCounts = new Map<string, number>();
   for (const r of interestRes.data ?? []) interestCounts.set(r.interest ?? 'unclear', (interestCounts.get(r.interest ?? 'unclear') ?? 0) + 1);
@@ -78,7 +79,7 @@ export default async function CampaignDetailPage(props: PageProps<'/campaigns/[i
   const editable = campaign.status === 'draft' || campaign.status === 'paused';
   const line = campaign.phone_numbers as { label: string; phone_e164: string } | null;
   const agent = campaign.voice_agents as { name: string } | null;
-  const liveAvailable = (await TelephonyService.liveStatus()).available;
+  const liveAvailable = liveRes.available;
 
   return (
     <>
