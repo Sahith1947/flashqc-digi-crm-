@@ -29,7 +29,7 @@ export async function GET(_req: NextRequest, ctx: RouteContext<'/api/export/camp
           r.full_name,
           r.phone_e164,
           r.business_name,
-          INTEREST_LABELS[(r.interest ?? 'unclear') as Interest | 'pending'],
+          INTEREST_LABELS[(r.interest ?? 'unclear') as Interest | 'pending' | 'skipped'],
           LEAD_STAGE_LABELS[(r.lead_stage ?? 'new') as LeadStage],
           r.emotion ?? '',
           r.summary ?? '',

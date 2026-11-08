@@ -108,7 +108,7 @@ export function emotionTone(label: string | null | undefined): 'good' | 'neutral
 // ---- Interest (one simple word per call; mirrors public.call_interest in the database) ----
 export const INTERESTS = ['interested', 'callback', 'confused', 'not_interested', 'hung_up', 'no_answer', 'unclear'] as const;
 export type Interest = (typeof INTERESTS)[number];
-export const INTEREST_LABELS: Record<Interest | 'pending', string> = {
+export const INTEREST_LABELS: Record<Interest | 'pending' | 'skipped', string> = {
   interested: 'Interested',
   callback: 'Callback',
   confused: 'Confused',
@@ -117,8 +117,9 @@ export const INTEREST_LABELS: Record<Interest | 'pending', string> = {
   no_answer: 'No answer',
   unclear: 'Needs review',
   pending: 'Not called yet',
+  skipped: 'Skipped (DND / no consent)',
 };
-export const INTEREST_TONE: Record<Interest | 'pending', 'good' | 'warning' | 'info' | 'critical' | 'neutral'> = {
+export const INTEREST_TONE: Record<Interest | 'pending' | 'skipped', 'good' | 'warning' | 'info' | 'critical' | 'neutral'> = {
   interested: 'good',
   callback: 'warning',
   confused: 'info',
@@ -127,6 +128,7 @@ export const INTEREST_TONE: Record<Interest | 'pending', 'good' | 'warning' | 'i
   no_answer: 'neutral',
   unclear: 'neutral',
   pending: 'neutral',
+  skipped: 'neutral',
 };
 
 export function interestOf(input: { answered: boolean; outcome?: string | null; emotion?: string | null; durationSeconds?: number | null }): Interest {

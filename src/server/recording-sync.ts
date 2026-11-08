@@ -20,6 +20,8 @@ export function scheduleRecordingSweep() {
     await SarvamService.autoSync(admin).catch((e) => console.error('[agent version sync]', e));
     const { reconcileInstantCalls } = await import('@/server/providers/sarvam/instant');
     await reconcileInstantCalls(admin).catch((e) => console.error('[instant reconcile]', e));
+    const { reconcileRunningCampaigns } = await import('@/server/services/campaign-sync');
+    await reconcileRunningCampaigns(admin).catch((e) => console.error('[campaign reconcile]', e));
     await SarvamService.sweepRecordings(admin, 5).catch((e) => console.error('[recording sweep]', e));
     await VobizService.sync(admin).catch((e) => console.error('[vobiz sweep]', e));
     const { SarvamRecordings } = await import('@/server/services/sarvam-recordings');

@@ -21,6 +21,7 @@ export interface InstantCallInput {
   variables: Record<string, string>;
   baseUrl: string;
   callId: string;
+  extraMetadata?: Record<string, string>;
 }
 
 /** Thrown when Sarvam definitely refused the call (nothing was dialled), so a fallback is safe. */
@@ -36,7 +37,7 @@ export async function placeInstantCall(input: InstantCallInput): Promise<string>
       ...(Object.keys(input.variables).length ? { agent_variables: input.variables } : {}),
     },
     user_config: { user_phone_number: input.userPhone },
-    webhook_config: SarvamCalling.webhookConfig(input.baseUrl, { crm_kind: 'instant', call_id: input.callId, app_id: input.appId }),
+    webhook_config: SarvamCalling.webhookConfig(input.baseUrl, { crm_kind: 'instant', call_id: input.callId, app_id: input.appId, ...(input.extraMetadata ?? {}) }),
   };
   let res: Response;
   try {

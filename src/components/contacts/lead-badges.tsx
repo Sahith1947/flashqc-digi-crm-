@@ -33,6 +33,6 @@ export function EmotionBadge({ emotion }: { emotion: string | null }) {
 }
 
 export function InterestBadge({ interest }: { interest: string | null }) {
-  const k = (interest ?? 'unclear') as Interest | 'pending';
+  const k = (interest ?? 'unclear') as Interest | 'pending' | 'skipped';
   return <Badge tone={INTEREST_TONE[k] ?? 'neutral'}>{INTEREST_LABELS[k] ?? k}</Badge>;
 }

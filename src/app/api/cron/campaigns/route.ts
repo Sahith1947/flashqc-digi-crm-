@@ -40,13 +40,19 @@ export async function POST(req: NextRequest) {
   } catch (e) {
     reconciled = e instanceof Error ? e.message : 'failed';
   }
+  let campaignResults: number | string = 0;
+  try {
+    campaignResults = await (await import('@/server/services/campaign-sync')).reconcileRunningCampaigns(admin, 20);
+  } catch (e) {
+    campaignResults = e instanceof Error ? e.message : 'failed';
+  }
   let recordings: number | null | string = null;
   try {
     recordings = await VobizService.sync(admin);
   } catch (e) {
     recordings = e instanceof Error ? e.message : 'failed';
   }
-  return NextResponse.json({ processedCampaigns: results.length, results, recordings, agents, reconciled });
+  return NextResponse.json({ processedCampaigns: results.length, results, recordings, agents, reconciled, campaignResults });
 }
 
 // Vercel Cron sends GET with "Authorization: Bearer $CRON_SECRET".

@@ -135,3 +135,11 @@ The CRM now pulls recordings from **Vobiz**, the SIP trunk behind the Sarvam num
 - `npm run test:instant` 17/17.
 
 **Hot Leads (`/leads`).** Tabs Interested / Callback / Meeting booked / Converted / All, with counts. Each client row has the AI's reason from the last call, last call time, Play, Move to (stage) and Call now. The dashboard has a "Follow up now" card with the four counts, linking to the tabs. e2e 91/91.
+
+## Update: campaigns made reliable and instant
+
+- **Instant kickoff:** Sarvam starts a new campaign ≥120 s after creation, so on Start the first 5 callable contacts (inside the calling window) are dialled immediately via the instant API with `cc_id` in the webhook metadata. The rest go to the Sarvam campaign. If an instant call is refused, that contact goes to the campaign instead; if it is unconfirmed, it is never called twice. The start toast says how many are ringing and when Sarvam dials the rest.
+- **Lost results:** `reconcileCampaign()` reads Sarvam's attempts report (filter `campaign_id`), finds attempts for contacts still in progress after 10 min that the CRM has not stored, and replays them through the webhook pipeline (report fields normalised: 1-based retry, `NO_INTERACTION_ID`, `NO_FAILURE_REASON`, `UNKNOWN`). Campaigns therefore always complete. It runs in the background, on cron and on the new "Refresh results from Sarvam" button.
+- **Resume on newer version:** before resuming a paused Sarvam campaign, its `app_config` is patched to the newest published version.
+- **Skipped contacts** (DND, revoked consent, suppression) show as "Skipped (DND / no consent)" with the reason, not "Not called yet".
+- `npm run test:campaigns` 21/21 against fake Sarvam MCP + REST: kickoff, 130 s start, compliance skips, instant and campaign results, busy→retry, lost retry recovered, completion, results chips, pause, resume on v10, cancel. All other suites pass.

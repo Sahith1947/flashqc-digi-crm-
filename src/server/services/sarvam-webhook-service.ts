@@ -481,7 +481,8 @@ export const SarvamWebhookService = {
       completion_status: p.status === 'connected' ? 'completed' : 'failed',
       connectivity_status: p.status,
       failure_reason: p.failure_reason ?? null,
-      user_identifier: `call:${call.id}`,
+      // Campaign kickoff calls carry their campaign contact, so the campaign row is updated too.
+      user_identifier: typeof meta.cc_id === 'string' && /^[0-9a-f-]{36}$/.test(meta.cc_id) ? `cc:${meta.cc_id}` : `call:${call.id}`,
       user_phone_number: call.phone_e164,
       agent_phone_number: p.channel_info?.agent_phone_number ?? null,
       app_id: typeof meta.app_id === 'string' ? meta.app_id : '',

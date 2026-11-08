@@ -133,19 +133,29 @@ export const SarvamCalling = {
       start_timestamp: start.toISOString(),
       end_timestamp: end.toISOString(),
       allowed_schedule: { timezone: 'Asia/Kolkata', allowed_start_time: hhmm(input.windowStart), allowed_end_time: hhmm(input.windowEnd), allowed_days: ALL_DAYS },
-      app_config: {
-        app_type: 'agent',
-        app_id: input.agent.appId,
-        app_version: input.agent.version,
-        attempts_per_second: 1.0,
-        connection_configs: [{ connection_id: input.line.connectionId, phone_numbers: [input.line.phone], weight: 1 }],
-        retry_config: retryConfig(input.maxAttempts),
-        webhook_config: this.webhookConfig(input.baseUrl, input.metadata),
-      },
+      app_config: this.campaignAppConfig(input),
     });
     const id = res.id ?? res.campaign_id;
     if (!id) throw new AppError('Sarvam did not return a campaign id.', 'sarvam_tool');
     return id;
+  },
+
+  campaignAppConfig(input: { agent: LiveAgent; line: LiveLine; baseUrl: string; maxAttempts: number; metadata?: Record<string, string> }) {
+    return {
+      app_type: 'agent',
+      app_id: input.agent.appId,
+      app_version: input.agent.version,
+      attempts_per_second: 1.0,
+      connection_configs: [{ connection_id: input.line.connectionId, phone_numbers: [input.line.phone], weight: 1 }],
+      retry_config: retryConfig(input.maxAttempts),
+      webhook_config: this.webhookConfig(input.baseUrl, input.metadata),
+    };
+  },
+
+  /** While a campaign is paused: move it to the agent's newest published version (and current line). */
+  async patchCampaignAgent(admin: DB, campaignId: string, input: { agent: LiveAgent; line: LiveLine; baseUrl: string; maxAttempts: number; metadata?: Record<string, string> }) {
+    const c = await client(admin);
+    await c.callTool('configure_campaign', { campaign_id: campaignId, app_config: this.campaignAppConfig(input) });
   },
 
   async streamUsers(admin: DB, campaignId: string, name: string, users: CohortUser[]): Promise<string[]> {

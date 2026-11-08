@@ -19,7 +19,8 @@
     "test:vobiz": "node tests/integration/vobiz-recordings.cjs",
     "test:recordings": "node tests/integration/sarvam-recordings.cjs",
     "test:versions": "node tests/integration/sarvam-versions.cjs",
-    "test:instant": "node tests/integration/sarvam-instant.cjs"
+    "test:instant": "node tests/integration/sarvam-instant.cjs",
+    "test:campaigns": "node tests/integration/sarvam-campaigns.cjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

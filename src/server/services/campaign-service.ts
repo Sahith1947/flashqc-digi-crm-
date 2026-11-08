@@ -25,6 +25,9 @@ async function getCampaign(db: DB, id: string) {
   return data;
 }
 
+/** Contacts dialled instantly when a new live campaign starts (Sarvam starts the campaign itself ~2 minutes later). */
+const KICKOFF = 5;
+
 export const CampaignService = {
   async enrollContacts(db: DB, campaignId: string, contactIds: string[]): Promise<number> {
     const unique = [...new Set(contactIds)];
@@ -41,7 +44,8 @@ export const CampaignService = {
     return added;
   },
 
-  async transition(db: DB, id: string, to: 'running' | 'paused' | 'cancelled' | 'completed') {
+  async transition(db: DB, id: string, to: 'running' | 'paused' | 'cancelled' | 'completed'): Promise<{ uploaded: number; instant: number } | null> {
+    let started: { uploaded: number; instant: number } | null = null;
     const campaign = await getCampaign(db, id);
     if (!TRANSITIONS[campaign.status]?.includes(to)) {
       throw new AppError(`A ${campaign.status} campaign cannot be changed to ${to}`, 'invalid_transition');
@@ -57,7 +61,7 @@ export const CampaignService = {
       if (campaign.mode === 'live') {
         const live = await TelephonyService.liveStatus({ voiceAgentId: campaign.voice_agent_id, phoneNumberId: campaign.phone_number_id });
         if (!live.available) throw new AppError(`Live calling is not ready: ${live.reason}`, 'live_not_ready');
-        if (live.via === 'sarvam') await this.startOnSarvam(db, campaign);
+        if (live.via === 'sarvam') started = await this.startOnSarvam(db, campaign);
         else if (!campaign.phone_number_id) throw new AppError('Select a business phone number for a live campaign');
       }
     }
@@ -84,6 +88,7 @@ export const CampaignService = {
     if (to === 'cancelled') {
       await db.from('campaign_contacts').update({ status: 'skipped', skip_reason: 'Campaign cancelled' }).eq('campaign_id', id).eq('status', 'pending');
     }
+    return started;
   },
 
   /**
@@ -117,8 +122,17 @@ export const CampaignService = {
         .eq('id', campaign.id);
       if (error) throw error;
     } else {
+      // Paused campaigns can be edited: switch to the newest published agent version before resuming.
+      await SarvamCalling.patchCampaignAgent(admin, providerId, {
+        agent: r.agent,
+        line: r.line,
+        baseUrl: r.baseUrl,
+        maxAttempts: campaign.max_attempts,
+        metadata: { crm_kind: 'campaign', crm_campaign_id: campaign.id },
+      }).catch((e) => console.error('[sarvam] campaign version patch', e));
       await SarvamCalling.control(admin, providerId, 'resume');
     }
+    const isNew = !campaign.provider_campaign_id;
 
     // Upload pending contacts (new campaign, or contacts added while paused).
     const { data: pending, error } = await db
@@ -128,10 +142,10 @@ export const CampaignService = {
       .eq('status', 'pending')
       .limit(10000);
     if (error) throw error;
-    type Row = { id: string; contacts: { phone_e164: string; full_name: string | null; business_name: string | null; business_category: string | null; city: string | null; consent_status: string; dnd_status: string } | null };
+    type Row = { id: string; contact_id: string; contacts: { phone_e164: string; full_name: string | null; business_name: string | null; business_category: string | null; city: string | null; consent_status: string; dnd_status: string } | null };
     const rows = (pending ?? []) as unknown as Row[];
     const suppressed = await suppressedNumbers(db, rows.map((x) => x.contacts?.phone_e164).filter((x): x is string => Boolean(x)));
-    const send: { ccId: string; user: { user_phone_number: string; user_identifier: string; app_variables: Record<string, string> } }[] = [];
+    const send: { ccId: string; contactId: string; user: { user_phone_number: string; user_identifier: string; app_variables: Record<string, string> } }[] = [];
     for (const row of rows) {
       const c = row.contacts;
       const check = c ? evaluateCallable(suppressed.has(c.phone_e164), c) : { allowed: false, reason: 'Contact no longer exists' };
@@ -144,7 +158,63 @@ export const CampaignService = {
       if (c.business_name) vars.business_name = c.business_name;
       if (c.business_category) vars.business_category = c.business_category;
       if (c.city) vars.location = c.city;
-      send.push({ ccId: row.id, user: { user_phone_number: c.phone_e164, user_identifier: `cc:${row.id}`, app_variables: vars } });
+      send.push({ ccId: row.id, contactId: row.contact_id, user: { user_phone_number: c.phone_e164, user_identifier: `cc:${row.id}`, app_variables: vars } });
+    }
+    // Instant kickoff: a new Sarvam campaign starts dialling ~2 minutes after creation, so the first few
+    // contacts are called right away through the instant API (inside the calling window only).
+    let instant = 0;
+    if (isNew && send.length && isWithinWindow(istTimeOfDay(), campaign.calling_window_start, campaign.calling_window_end)) {
+      const { instantCredsFor, placeInstantCall, InstantRefused } = await import('@/server/providers/sarvam/instant');
+      const creds = await instantCredsFor(admin);
+      if (creds) {
+        const keep: typeof send = [];
+        for (const item of send) {
+          if (instant >= KICKOFF) {
+            keep.push(item);
+            continue;
+          }
+          const { data: callRow, error: callErr } = await admin
+            .from('calls')
+            .insert({ direction: 'outbound', status: 'queued', phone_e164: item.user.user_phone_number, contact_id: item.contactId, phone_number_id: r.line.id, voice_agent_id: r.agent.id, campaign_id: campaign.id, is_simulated: false })
+            .select('id')
+            .single();
+          if (callErr || !callRow) {
+            keep.push(item);
+            continue;
+          }
+          try {
+            const attemptId = await placeInstantCall({
+              apiKey: creds.apiKey,
+              orgId: creds.orgId,
+              workspaceId: creds.workspaceId,
+              appId: r.agent.appId,
+              appVersion: r.agent.version,
+              connectionId: r.line.connectionId,
+              agentPhone: r.line.phone,
+              userPhone: item.user.user_phone_number,
+              variables: item.user.app_variables,
+              baseUrl: r.baseUrl,
+              callId: callRow.id,
+              extraMetadata: { cc_id: item.ccId },
+            });
+            await admin.from('calls').update({ provider: 'sarvam', provider_call_id: attemptId, status: 'ringing' }).eq('id', callRow.id);
+            await admin.from('call_events').insert({ call_id: callRow.id, event_type: 'submitted_to_sarvam', status: 'ringing', source: 'system', payload: { via: 'instant', attempt_id: attemptId, agent: r.agent.appId, agent_version: r.agent.version, from: r.line.phone, campaign_contact_id: item.ccId } });
+            await admin.from('campaign_contacts').update({ status: 'in_progress', last_attempt_at: new Date().toISOString(), last_call_id: callRow.id }).eq('id', item.ccId);
+            instant++;
+          } catch (e) {
+            if (e instanceof InstantRefused) {
+              await admin.from('calls').delete().eq('id', callRow.id); // nothing was dialled: let the campaign call them
+              keep.push(item);
+            } else {
+              // Unknown whether Sarvam dialled: never call twice; the result or the safety net settles it.
+              await admin.from('calls').update({ provider: 'sarvam', status: 'ringing' }).eq('id', callRow.id);
+              await admin.from('campaign_contacts').update({ status: 'in_progress', last_attempt_at: new Date().toISOString(), last_call_id: callRow.id }).eq('id', item.ccId);
+            }
+          }
+        }
+        send.length = 0;
+        send.push(...keep);
+      }
     }
     if (send.length) {
       await SarvamCalling.streamUsers(admin, providerId, `CRM ${campaign.name}`, send.map((x) => x.user));
@@ -153,7 +223,7 @@ export const CampaignService = {
         await db.from('campaign_contacts').update({ status: 'in_progress', last_attempt_at: now }).in('id', send.slice(i, i + 500).map((x) => x.ccId)).eq('status', 'pending');
       }
     }
-    return { uploaded: send.length };
+    return { uploaded: send.length, instant };
   },
 
   /**

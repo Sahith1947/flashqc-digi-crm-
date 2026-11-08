@@ -144,9 +144,13 @@ export async function removeCampaignContact(campaignId: string, campaignContactI
 export async function transitionCampaign(id: string, to: 'running' | 'paused' | 'cancelled'): Promise<ActionResult> {
   return runAction(async () => {
     const { db } = await assertRole('manager');
-    await CampaignService.transition(db, uuid.parse(id), z.enum(['running', 'paused', 'cancelled']).parse(to));
+    const started = await CampaignService.transition(db, uuid.parse(id), z.enum(['running', 'paused', 'cancelled']).parse(to));
     refresh(id);
-    const msg = { running: 'Campaign is running.', paused: 'Campaign paused.', cancelled: 'Campaign cancelled. Pending contacts were skipped.' }[to];
+    const live =
+      started && (started.instant || started.uploaded)
+        ? `Campaign is running. ${started.instant ? `${started.instant} call${started.instant === 1 ? ' is' : 's are'} ringing now` : 'Sarvam has the contacts'}${started.uploaded ? `; Sarvam dials the other ${started.uploaded} from about 2 minutes from now` : ''}.`
+        : null;
+    const msg = live ?? { running: 'Campaign is running.', paused: 'Campaign paused.', cancelled: 'Campaign cancelled. Pending contacts were skipped.' }[to];
     return { ok: true, message: msg };
   });
 }
@@ -197,5 +201,19 @@ export async function callContactAgain(campaignId: string, contactId: string): P
       ok: true,
       message: res.simulated ? 'Simulated call recorded. No real call was placed.' : 'Calling now through Sarvam. The result, recording and reason appear in Call Logs when the call ends.',
     };
+  });
+}
+
+/** Fills in any results Sarvam has that the CRM is missing (lost webhooks). */
+export async function refreshCampaignResults(id: string): Promise<ActionResult> {
+  return runAction(async () => {
+    await assertRole('manager');
+    const { createAdminClient } = await import('@/lib/supabase/admin');
+    const admin = createAdminClient();
+    if (!admin) return { ok: false, error: 'SUPABASE_SECRET_KEY is not set on the server.' };
+    const { reconcileCampaign } = await import('@/server/services/campaign-sync');
+    const r = await reconcileCampaign(admin, uuid.parse(id), { staleMinutes: 2 });
+    refresh(id);
+    return { ok: true, message: r.replayed ? `${r.replayed} missing result${r.replayed === 1 ? '' : 's'} added from Sarvam.` : `Up to date with Sarvam${r.stillOpen ? ` (${r.stillOpen} contact${r.stillOpen === 1 ? '' : 's'} still being called)` : ''}.` };
   });
 }
