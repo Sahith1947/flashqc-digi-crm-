@@ -1,6 +1,7 @@
 import { FilterBar, type FilterSelect } from '@/components/ui/filter-bar';
 import { CALL_OUTCOME_LABELS, CALL_OUTCOMES, CALL_STATUS_LABELS, CALL_STATUSES } from '@/lib/constants';
 import type { CallFilters } from '@/server/queries/calls';
+import { INTEREST_LABELS, INTERESTS } from '@/lib/leads';
 
 export function CallFilterBar({
   basePath,
@@ -15,7 +16,9 @@ export function CallFilterBar({
   hideDirection?: boolean;
   sort?: { sort?: string; dir?: string };
 }) {
-  const selects: FilterSelect[] = [];
+  const selects: FilterSelect[] = [
+    { name: 'interest', label: 'Interest', anyLabel: 'Any interest', value: filters.interest, options: INTERESTS.map((i) => ({ value: i, label: INTEREST_LABELS[i] })) },
+  ];
   if (!hideDirection)
     selects.push({
       name: 'direction',

@@ -104,3 +104,37 @@ export function emotionTone(label: string | null | undefined): 'good' | 'neutral
       return 'neutral';
   }
 }
+
+// ---- Interest (one simple word per call; mirrors public.call_interest in the database) ----
+export const INTERESTS = ['interested', 'callback', 'confused', 'not_interested', 'no_answer', 'unclear'] as const;
+export type Interest = (typeof INTERESTS)[number];
+export const INTEREST_LABELS: Record<Interest | 'pending', string> = {
+  interested: 'Interested',
+  callback: 'Callback',
+  confused: 'Confused',
+  not_interested: 'Not interested',
+  no_answer: 'No answer',
+  unclear: 'Needs review',
+  pending: 'Not called yet',
+};
+export const INTEREST_TONE: Record<Interest | 'pending', 'good' | 'warning' | 'info' | 'critical' | 'neutral'> = {
+  interested: 'good',
+  callback: 'warning',
+  confused: 'info',
+  not_interested: 'critical',
+  no_answer: 'neutral',
+  unclear: 'neutral',
+  pending: 'neutral',
+};
+
+export function interestOf(input: { answered: boolean; outcome?: string | null; emotion?: string | null }): Interest {
+  if (!input.answered) return 'no_answer';
+  const o = input.outcome ?? '';
+  if (o === 'callback_requested') return 'callback';
+  if (o === 'converted' || o === 'interested') return 'interested';
+  if (o === 'not_interested' || o === 'do_not_call' || o === 'wrong_number') return 'not_interested';
+  if (input.emotion === 'Confused') return 'confused';
+  if (input.emotion === 'Excited' || input.emotion === 'Interested') return 'interested';
+  if (input.emotion === 'Disinterested' || input.emotion === 'Annoyed') return 'not_interested';
+  return 'unclear';
+}

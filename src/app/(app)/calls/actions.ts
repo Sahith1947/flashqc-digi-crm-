@@ -200,7 +200,7 @@ export async function checkCallRecording(callId: string): Promise<ActionResult> 
     refreshCall(id);
     if (fromVobiz) return { ok: true, message: 'Recording found in Vobiz and attached.' };
     if (fromVobiz === null) {
-      return { ok: false, error: 'Sarvam does not keep recordings for your account. Connect Vobiz (your phone line) on the Integrations page to get call recordings.' };
+      return { ok: false, error: 'Add your Sarvam API key on the Integrations page (Sarvam card) to get call recordings.' };
     }
     return { ok: false, error: 'Vobiz has no recording for this call yet. Make sure call recording is switched on for your phone line in the Vobiz console.' };
   });
@@ -210,7 +210,7 @@ export async function getCallPlayback(callId: string): Promise<{ url: string | n
   const { db } = await assertRole('viewer');
   const { data: rec } = await db
     .from('call_recordings')
-    .select('storage_bucket, storage_path, provider_recording_id, provider_recording_url')
+    .select('id, storage_bucket, storage_path, provider_recording_id, provider_recording_url')
     .eq('call_id', uuid.parse(callId))
     .order('created_at', { ascending: false })
     .limit(1)

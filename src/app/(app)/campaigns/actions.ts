@@ -8,6 +8,7 @@ import { assertRole } from '@/server/auth';
 import { runAction } from '@/server/action-utils';
 import { AppError } from '@/server/providers/types';
 import { CampaignService } from '@/server/services/campaign-service';
+import { TelephonyService } from '@/server/services/telephony-service';
 import { ContactService } from '@/server/services/contact-service';
 import { applyContactFilters, parseContactFilters } from '@/server/queries/contacts';
 import type { DB } from '@/lib/supabase/types';
@@ -173,4 +174,28 @@ export async function deleteCampaign(id: string): Promise<ActionResult> {
   });
   if (res.ok) redirect('/campaigns');
   return res;
+}
+
+/** "Call again" from campaign results: one call to this contact with the campaign's number and agent. */
+export async function callContactAgain(campaignId: string, contactId: string): Promise<ActionResult> {
+  return runAction(async () => {
+    const { db } = await assertRole('agent');
+    const { data: cp } = await db.from('campaigns').select('mode, phone_number_id, voice_agent_id').eq('id', uuid.parse(campaignId)).maybeSingle();
+    if (!cp) throw new AppError('Campaign not found.');
+    const { data: ct } = await db.from('contacts').select('id, phone_e164').eq('id', uuid.parse(contactId)).maybeSingle();
+    if (!ct) throw new AppError('Contact not found.');
+    const res = await TelephonyService.startOutboundCall(db, {
+      phoneE164: ct.phone_e164,
+      contactId: ct.id,
+      phoneNumberId: cp.phone_number_id,
+      voiceAgentId: cp.voice_agent_id,
+      mode: cp.mode === 'live' ? 'live' : 'simulated',
+    });
+    revalidatePath(`/campaigns/${campaignId}`);
+    revalidatePath('/calls');
+    return {
+      ok: true,
+      message: res.simulated ? 'Simulated call recorded. No real call was placed.' : 'Calling now through Sarvam. The result, recording and reason appear in Call Logs when the call ends.',
+    };
+  });
 }

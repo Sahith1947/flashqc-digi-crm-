@@ -207,6 +207,9 @@ export const SarvamService = {
     if (!call || call.is_simulated || call.provider !== 'sarvam' || !call.answered_at) return 'not_applicable';
     const { count } = await admin.from('call_recordings').select('id', { count: 'exact', head: true }).eq('call_id', callId);
     if (count) return 'already';
+    // With a Sarvam API key every answered call's recording is available through the Analytics API.
+    const { SarvamRecordings } = await import('@/server/services/sarvam-recordings');
+    if (await SarvamRecordings.mark(admin, callId)) return 'attached';
     const { data: ev } = await admin
       .from('call_events')
       .select('payload')

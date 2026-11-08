@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { RecordingPlayButton } from './recording-play-button';
 import { SelectAllCalls } from './bulk-call-actions';
 import { BULK_FORM_ID } from './bulk-form-id';
-import { EmotionBadge } from '@/components/contacts/lead-badges';
+import { EmotionBadge, InterestBadge } from '@/components/contacts/lead-badges';
 import type { CallLogRow } from '@/lib/supabase/types';
 import { CALL_OUTCOME_LABELS, labelFor } from '@/lib/constants';
 import { formatDateTime, formatDuration } from '@/lib/dates';
@@ -17,7 +17,7 @@ export function callRef(n: number | null | undefined) {
 }
 
 /** 'business' is kept for older callers; the business now shows under the contact name. 'artifacts' is the Recording column. */
-type Column = 'direction' | 'campaign' | 'business' | 'artifacts' | 'outcome' | 'emotion';
+type Column = 'direction' | 'campaign' | 'business' | 'artifacts' | 'outcome' | 'emotion' | 'interest';
 
 export function CallsTable({
   rows,
@@ -50,6 +50,7 @@ export function CallsTable({
             {header('Date & time (IST)', 'started_at')}
             {header('Duration', 'duration_seconds')}
             {header('Status', 'status')}
+            {show('interest') && <Th>Interest</Th>}
             {show('emotion') && <Th>Emotion</Th>}
             {show('artifacts') && <Th>Recording</Th>}
             {show('outcome') && <Th>Outcome</Th>}
@@ -93,6 +94,11 @@ export function CallsTable({
               <Td>
                 <CallStatusBadge status={c.status ?? ''} />
               </Td>
+              {show('interest') && (
+                <Td>
+                  <InterestBadge interest={c.interest} />
+                </Td>
+              )}
               {show('emotion') && (
                 <Td>
                   <EmotionBadge emotion={c.emotion} />

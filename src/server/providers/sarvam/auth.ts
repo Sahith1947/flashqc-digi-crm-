@@ -218,6 +218,19 @@ export const SarvamAuth = {
     }
   },
 
+  /** org_id / workspace_id from the saved sign-in token (readable even after the token expires). */
+  async workspace(admin: DB): Promise<{ orgId: string; workspaceId: string } | null> {
+    const row = await readRow(admin, CREDS_KEY);
+    if (!row) return null;
+    try {
+      const t = JSON.parse(decryptSecret(row.ciphertext, CREDS_KEY)) as StoredTokens;
+      const claims = JSON.parse(Buffer.from(t.access_token.split('.')[1], 'base64url').toString('utf8')) as { org_id?: string; workspace_id?: string };
+      return claims.org_id && claims.workspace_id ? { orgId: claims.org_id, workspaceId: claims.workspace_id } : null;
+    } catch {
+      return null;
+    }
+  },
+
   /** Used once to adopt an already-approved token (e.g. from a CLI sign-in). */
   async importTokens(admin: DB, tok: Record<string, unknown>, clientId: string) {
     return saveTokens(admin, tok, clientId, null);

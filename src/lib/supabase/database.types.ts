@@ -76,6 +76,12 @@ isOneToOne: false
       referencedRelation: "calls"
       referencedColumns: ["id"]
     },{
+      foreignKeyName: "call_events_call_id_fkey"
+      columns: ["call_id"]
+isOneToOne: false
+      referencedRelation: "campaign_results_view"
+      referencedColumns: ["call_id"]
+    },{
       foreignKeyName: "call_events_created_by_fkey"
       columns: ["created_by"]
 isOneToOne: false
@@ -107,6 +113,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "calls"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "call_recordings_call_id_fkey"
+      columns: ["call_id"]
+isOneToOne: false
+      referencedRelation: "campaign_results_view"
+      referencedColumns: ["call_id"]
     },{
       foreignKeyName: "call_recordings_uploaded_by_fkey"
       columns: ["uploaded_by"]
@@ -140,6 +152,12 @@ isOneToOne: true
       referencedRelation: "calls"
       referencedColumns: ["id"]
     },{
+      foreignKeyName: "call_summaries_call_id_fkey"
+      columns: ["call_id"]
+isOneToOne: true
+      referencedRelation: "campaign_results_view"
+      referencedColumns: ["call_id"]
+    },{
       foreignKeyName: "call_summaries_created_by_fkey"
       columns: ["created_by"]
 isOneToOne: false
@@ -172,6 +190,12 @@ isOneToOne: true
       referencedRelation: "calls"
       referencedColumns: ["id"]
     },{
+      foreignKeyName: "call_transcripts_call_id_fkey"
+      columns: ["call_id"]
+isOneToOne: true
+      referencedRelation: "campaign_results_view"
+      referencedColumns: ["call_id"]
+    },{
       foreignKeyName: "call_transcripts_created_by_fkey"
       columns: ["created_by"]
 isOneToOne: false
@@ -203,6 +227,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "campaigns"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "calls_contact_id_fkey"
+      columns: ["contact_id"]
+isOneToOne: false
+      referencedRelation: "campaign_results_view"
+      referencedColumns: ["contact_id"]
     },{
       foreignKeyName: "calls_contact_id_fkey"
       columns: ["contact_id"]
@@ -263,6 +293,12 @@ isOneToOne: false
       foreignKeyName: "campaign_contacts_contact_id_fkey"
       columns: ["contact_id"]
 isOneToOne: false
+      referencedRelation: "campaign_results_view"
+      referencedColumns: ["contact_id"]
+    },{
+      foreignKeyName: "campaign_contacts_contact_id_fkey"
+      columns: ["contact_id"]
+isOneToOne: false
       referencedRelation: "contacts"
       referencedColumns: ["id"]
     },{
@@ -283,6 +319,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "calls"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "campaign_contacts_last_call_id_fkey"
+      columns: ["last_call_id"]
+isOneToOne: false
+      referencedRelation: "campaign_results_view"
+      referencedColumns: ["call_id"]
     }
                   ]
                 },"campaigns": {
@@ -450,7 +492,7 @@ isOneToOne: false
           Views: {
             "call_log_view": {
                   Row: {
-                    "answered_at": string | null,"business_name": string | null,"business_phone_e164": string | null,"call_number": number,"campaign_id": string | null,"campaign_name": string | null,"contact_id": string | null,"contact_name": string | null,"created_at": string,"created_by": string | null,"direction": string,"duration_seconds": number,"emotion": string | null,"ended_at": string | null,"failure_reason": string | null,"has_recording": boolean | null,"has_summary": boolean | null,"has_transcript": boolean | null,"id": string,"is_answered": boolean | null,"is_simulated": boolean,"notes": string | null,"outcome": string | null,"phone_e164": string,"phone_number_id": string | null,"phone_number_label": string | null,"provider": string | null,"provider_call_id": string | null,"sentiment": string | null,"started_at": string,"status": string,"updated_at": string,"voice_agent_id": string | null,"voice_agent_name": string | null
+                    "answered_at": string | null,"business_name": string | null,"business_phone_e164": string | null,"call_number": number,"campaign_id": string | null,"campaign_name": string | null,"contact_id": string | null,"contact_name": string | null,"created_at": string,"created_by": string | null,"direction": string,"duration_seconds": number,"emotion": string | null,"ended_at": string | null,"failure_reason": string | null,"has_recording": boolean | null,"has_summary": boolean | null,"has_transcript": boolean | null,"id": string,"interest": string | null,"is_answered": boolean | null,"is_simulated": boolean,"notes": string | null,"outcome": string | null,"phone_e164": string,"phone_number_id": string | null,"phone_number_label": string | null,"provider": string | null,"provider_call_id": string | null,"sentiment": string | null,"started_at": string,"status": string,"updated_at": string,"voice_agent_id": string | null,"voice_agent_name": string | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -466,6 +508,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "campaigns"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "calls_contact_id_fkey"
+      columns: ["contact_id"]
+isOneToOne: false
+      referencedRelation: "campaign_results_view"
+      referencedColumns: ["contact_id"]
     },{
       foreignKeyName: "calls_contact_id_fkey"
       columns: ["contact_id"]
@@ -495,6 +543,26 @@ isOneToOne: false
       columns: ["voice_agent_id"]
 isOneToOne: false
       referencedRelation: "voice_agents"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"campaign_results_view": {
+                  Row: {
+                    "attempts": number,"business_name": string | null,"call_id": string | null,"call_status": string | null,"campaign_contact_id": string,"campaign_id": string,"contact_id": string,"contact_status": string,"created_at": string,"duration_seconds": number | null,"emotion": string | null,"full_name": string | null,"has_recording": boolean | null,"interest": string | null,"is_answered": boolean | null,"last_attempt_at": string | null,"lead_stage": string,"lead_temperature": string | null,"outcome": string | null,"phone_e164": string,"skip_reason": string | null,"summary": string | null
+                  }
+                  ComputedFields: never
+                  Relationships: [
+                    {
+      foreignKeyName: "campaign_contacts_campaign_id_fkey"
+      columns: ["campaign_id"]
+isOneToOne: false
+      referencedRelation: "campaign_stats"
+      referencedColumns: ["campaign_id"]
+    },{
+      foreignKeyName: "campaign_contacts_campaign_id_fkey"
+      columns: ["campaign_id"]
+isOneToOne: false
+      referencedRelation: "campaigns"
       referencedColumns: ["id"]
     }
                   ]
@@ -539,6 +607,12 @@ isOneToOne: false
       referencedRelation: "calls"
       referencedColumns: ["id"]
     },{
+      foreignKeyName: "call_recordings_call_id_fkey"
+      columns: ["call_id"]
+isOneToOne: false
+      referencedRelation: "campaign_results_view"
+      referencedColumns: ["call_id"]
+    },{
       foreignKeyName: "calls_campaign_id_fkey"
       columns: ["campaign_id"]
 isOneToOne: false
@@ -550,6 +624,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "campaigns"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "calls_contact_id_fkey"
+      columns: ["contact_id"]
+isOneToOne: false
+      referencedRelation: "campaign_results_view"
+      referencedColumns: ["contact_id"]
     },{
       foreignKeyName: "calls_contact_id_fkey"
       columns: ["contact_id"]
@@ -567,7 +647,10 @@ isOneToOne: false
                 }
           }
           Functions: {
-            "call_trends":
+            "call_interest":
+{ Args: { "p_answered": boolean,"p_emotion": string,"p_outcome": string }; Returns: string
+                           },
+"call_trends":
 { Args: { "p_from": string,"p_granularity"?: string,"p_scope"?: string,"p_to": string }; Returns: {
               "answered": number,"bucket": string,"failed": number,"inbound": number,"missed": number,"outbound": number,"total": number
             }[]

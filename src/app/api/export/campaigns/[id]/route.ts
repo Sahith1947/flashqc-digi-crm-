@@ -5,6 +5,7 @@ import { formatDateTime } from '@/lib/dates';
 import { isUuid } from '@/lib/list-params';
 import { CALL_OUTCOME_LABELS, CALL_STATUS_LABELS, labelFor } from '@/lib/constants';
 import { AppError } from '@/server/providers/types';
+import { INTEREST_LABELS, LEAD_STAGE_LABELS, type Interest, type LeadStage } from '@/lib/leads';
 
 export async function GET(_req: NextRequest, ctx: RouteContext<'/api/export/campaigns/[id]'>) {
   try {
@@ -16,34 +17,36 @@ export async function GET(_req: NextRequest, ctx: RouteContext<'/api/export/camp
     const rows: unknown[][] = [];
     for (let offset = 0; offset < 100000; offset += 1000) {
       const { data, error } = await db
-        .from('campaign_contacts')
-        .select('status, attempts, skip_reason, last_attempt_at, contacts(full_name, phone_e164, business_name, city), calls(status, duration_seconds, answered_at, outcome)')
+        .from('campaign_results_view')
+        .select('*')
         .eq('campaign_id', id)
         .order('created_at')
-        .order('id')
+        .order('campaign_contact_id')
         .range(offset, offset + 999);
       if (error) throw error;
-      for (const cc of data ?? []) {
-        const ct = cc.contacts as { full_name: string | null; phone_e164: string; business_name: string | null; city: string | null } | null;
-        const call = cc.calls as { status: string; duration_seconds: number; answered_at: string | null; outcome: string | null } | null;
+      for (const r of data ?? []) {
         rows.push([
-          ct?.full_name,
-          ct?.phone_e164,
-          ct?.business_name,
-          ct?.city,
-          cc.status,
-          cc.skip_reason,
-          cc.attempts,
-          call ? labelFor(CALL_STATUS_LABELS, call.status) : '',
-          call?.answered_at ? call.duration_seconds : '',
-          labelFor(CALL_OUTCOME_LABELS, call?.outcome, ''),
-          cc.last_attempt_at ? formatDateTime(cc.last_attempt_at) : '',
+          r.full_name,
+          r.phone_e164,
+          r.business_name,
+          INTEREST_LABELS[(r.interest ?? 'unclear') as Interest | 'pending'],
+          LEAD_STAGE_LABELS[(r.lead_stage ?? 'new') as LeadStage],
+          r.emotion ?? '',
+          r.summary ?? '',
+          r.contact_status,
+          r.skip_reason,
+          r.attempts,
+          r.call_id ? labelFor(CALL_STATUS_LABELS, r.call_status) : '',
+          r.is_answered ? r.duration_seconds : '',
+          labelFor(CALL_OUTCOME_LABELS, r.outcome, ''),
+          r.has_recording ? 'yes' : 'no',
+          r.last_attempt_at ? formatDateTime(r.last_attempt_at) : '',
           campaign.mode === 'simulated' ? 'SIMULATED' : 'live',
         ]);
       }
       if ((data?.length ?? 0) < 1000) break;
     }
-    const csv = toCsv(['name', 'phone', 'business', 'city', 'contact_status', 'skip_reason', 'attempts', 'call_status', 'duration_s', 'outcome', 'last_attempt_ist', 'data_type'], rows);
+    const csv = toCsv(['name', 'phone', 'business', 'interest', 'funnel_stage', 'emotion', 'why', 'contact_status', 'skip_reason', 'attempts', 'call_status', 'duration_s', 'outcome', 'recording', 'last_attempt_ist', 'data_type'], rows);
     const slug = campaign.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 50) || 'campaign';
     return new NextResponse('﻿' + csv, {
       headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="campaign-${slug}.csv"`, 'Cache-Control': 'no-store' },

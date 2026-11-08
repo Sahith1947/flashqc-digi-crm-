@@ -9,6 +9,7 @@ export type Profile = Tables<'profiles'>;
 export type Contact = Tables<'contacts'>;
 export type Call = Tables<'calls'>;
 export type CallLogRow = Views<'call_log_view'>;
+export type CampaignResultRow = Views<'campaign_results_view'>;
 export type ContactWithStats = Views<'contacts_with_stats'>;
 export type Campaign = Tables<'campaigns'>;
 export type CampaignStats = Views<'campaign_stats'>;

@@ -1,4 +1,5 @@
 import 'server-only';
+import { SarvamRecordings } from '@/server/services/sarvam-recordings';
 import { z } from 'zod';
 import type { Json, TablesInsert, TablesUpdate } from '@/lib/supabase/database.types';
 import type { DB } from '@/lib/supabase/types';
@@ -351,6 +352,7 @@ export const SarvamWebhookService = {
 
     await recordEvent(admin, callId, connected ? 'completed' : status, status, endedAt, p as unknown as Record<string, unknown>);
     const { outcome, emotion } = await attachConversation(admin, callId, p, connected);
+    if (connected) await SarvamRecordings.mark(admin, callId).catch((e) => console.error('[sarvam] mark recording', e));
     await upsertLead(admin, callId, look.phone, look.contactId, p, connected, emotion, 'live_call');
 
     if (campaignContactId) {
@@ -404,6 +406,7 @@ export const SarvamWebhookService = {
     }
     await recordEvent(admin, callId, 'completed', 'completed', endedAt, p as unknown as Record<string, unknown>);
     const { emotion } = await attachConversation(admin, callId, p, true);
+    await SarvamRecordings.mark(admin, callId).catch((e) => console.error('[sarvam] mark recording', e));
     await upsertLead(admin, callId, look.phone, look.contactId, p, true, emotion, 'inbound_call');
     return { callId, status: 'completed' as const };
   },

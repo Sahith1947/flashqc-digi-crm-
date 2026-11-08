@@ -9,6 +9,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { SarvamAuth } from '@/server/providers/sarvam/auth';
 import { SarvamService } from '@/server/services/sarvam-service';
 import { VobizService } from '@/server/services/vobiz-service';
+import { SarvamRecordings } from '@/server/services/sarvam-recordings';
 import { AppError } from '@/server/providers/types';
 
 const keySchema = z.enum(['sarvam_ai', 'telephony', 'recording_storage']);
@@ -181,5 +182,26 @@ export async function disconnectVobiz(): Promise<ActionResult> {
     await VobizService.disconnect(backend());
     revalidatePath('/integrations');
     return { ok: true, message: 'Vobiz disconnected. The saved keys were deleted; recordings already in Call Logs stay.' };
+  });
+}
+
+// ---------------------------------------------------------------- Sarvam recordings (API key)
+export async function saveSarvamApiKey(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  return runAction(async () => {
+    await assertRole('admin');
+    const key = String(fd.get('sarvam_api_key') ?? '');
+    if (!key.trim()) return { ok: false, error: 'Paste your Sarvam API key.' };
+    const n = await SarvamRecordings.saveKey(backend(), key);
+    revalidatePath('/', 'layout');
+    return { ok: true, message: `Recordings switched on.${n ? ` ${n} past call${n === 1 ? '' : 's'} now have a recording.` : ''} New calls get theirs automatically.` };
+  });
+}
+
+export async function removeSarvamApiKey(): Promise<ActionResult> {
+  return runAction(async () => {
+    await assertRole('admin');
+    await SarvamRecordings.removeKey(backend());
+    revalidatePath('/integrations');
+    return { ok: true, message: 'Sarvam API key deleted. Recordings already saved stay playable.' };
   });
 }

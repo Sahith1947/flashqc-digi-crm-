@@ -43,7 +43,7 @@ const server = http.createServer((req, res) => {
   await Promise.all([p.waitForURL(u => !u.pathname.startsWith('/login')), p.click('[data-testid=auth-submit]')]);
 
   // Before connecting: Call Logs explain how to get recordings.
-  await p.goto(BASE + '/integrations'); await p.getByTestId('vobiz-card').waitFor();
+  await p.goto(BASE + '/integrations?vobiz=1'); await p.getByTestId('vobiz-card').waitFor();
   ok((await p.getByTestId('vobiz-card').innerText()).includes('Not connected'), 'Vobiz card shows Not connected');
   // Wrong token is refused and nothing is stored.
   await p.fill('#vobiz_auth_id', AUTH_ID); await p.fill('#vobiz_auth_token', 'wrong-token-123');

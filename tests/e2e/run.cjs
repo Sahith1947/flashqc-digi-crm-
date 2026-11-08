@@ -606,12 +606,40 @@ function contactsCsv() {
     const rows = await admin.page.locator('[data-testid=campaign-contacts-table] tbody tr').count();
     assert(rows === 2, `skipped rows ${rows}`);
   });
+  await step('Campaign results: interest chips filter, funnel, why, call again', async () => {
+    await goto(admin.page, `/campaigns/${campaignId}`);
+    await admin.page.getByTestId('interest-chips').waitFor();
+    const heads = await admin.page.locator('[data-testid=campaign-contacts-table] thead th').allInnerTexts();
+    assert(['Interest', 'Funnel', 'Why', 'Recording'].every((h) => heads.some((x) => x.toLowerCase() === h.toLowerCase())), `headers ${heads.join('|')}`);
+    const counts = sql(`select interest||':'||n from (select interest, count(*) n from campaign_results_view where campaign_id='${campaignId}' group by interest) x`).split('\n').filter(Boolean);
+    assert(counts.length > 0, 'no interest data');
+    const [top, n] = counts.sort((a, b) => Number(b.split(':')[1]) - Number(a.split(':')[1]))[0].split(':');
+    await admin.page.getByTestId(`interest-chip-${top}`).click();
+    await admin.page.waitForURL(new RegExp(`interest=${top}`));
+    const rows = await admin.page.locator('[data-testid=campaign-contacts-table] tbody tr').count();
+    assert(rows === Math.min(25, Number(n)), `chip ${top}: rows ${rows} vs ${n}`);
+    const before = Number(sql('select count(*) from calls'));
+    await admin.page.getByTestId('call-again').first().click();
+    await admin.page.getByTestId('call-again-confirm').click();
+    await toast(admin.page, 'success', /Simulated call recorded/);
+    assert(Number(sql('select count(*) from calls')) === before + 1, 'call again did not place a call');
+  });
+  await step('Call Logs interest filter matches the database', async () => {
+    const n = Number(sql("select count(*) from call_log_view where interest='no_answer'"));
+    await goto(admin.page, '/calls?interest=no_answer');
+    const rows = n ? await admin.page.locator('[data-testid=calls-table] tbody tr').count() : 0;
+    assert(rows === Math.min(25, n), `no_answer rows ${rows} vs ${n}`);
+    const heads = await admin.page.locator('[data-testid=calls-table] thead th').allInnerTexts();
+    assert(heads.some((h) => /interest/i.test(h)), 'no Interest column');
+  });
   await step('Campaign report CSV export', async () => {
+    await goto(admin.page, `/campaigns/${campaignId}`);
     const [dl] = await Promise.all([admin.page.waitForEvent('download'), admin.page.getByRole('link', { name: 'Report CSV' }).click()]);
     const file = path.join(OUT, 'campaign-report.csv');
     await dl.saveAs(file);
     const lines = fs.readFileSync(file, 'utf8').trim().split(/\r?\n/);
     assert(lines.length === 31 && lines[1].includes('SIMULATED'), `lines ${lines.length}`);
+    assert(lines[0].includes('interest') && lines[0].includes('funnel_stage') && lines[0].includes('why'), `header ${lines[0]}`);
   });
   await step('Campaign from CSV upload, pause and resume, cancel', async () => {
     const p = path.join(OUT, 'campaign2.csv');

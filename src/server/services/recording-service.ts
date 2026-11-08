@@ -61,8 +61,20 @@ export const RecordingService = {
   /** Short-lived signed URL for private storage, or a provider-resolved URL. Never invents URLs. */
   async getPlaybackUrl(
     db: DB,
-    rec: { storage_bucket: string | null; storage_path: string | null; provider_recording_id: string | null; provider_recording_url?: string | null },
+    rec: { id?: string; storage_bucket: string | null; storage_path: string | null; provider_recording_id: string | null; provider_recording_url?: string | null },
   ): Promise<PlaybackResult> {
+    if (!rec.storage_path && rec.id && rec.provider_recording_id?.startsWith('sarvam:')) {
+      // Sarvam recording not downloaded yet: fetch it once into private storage, then play from there.
+      const { createAdminClient } = await import('@/lib/supabase/admin');
+      const { SarvamRecordings } = await import('@/server/services/sarvam-recordings');
+      const admin = createAdminClient();
+      if (!admin) return { url: null, error: 'SUPABASE_SECRET_KEY is not set on the server.' };
+      const err = await SarvamRecordings.materialize(admin, rec.id);
+      if (err) return { url: null, error: err };
+      const { data: fresh } = await admin.from('call_recordings').select('storage_bucket, storage_path').eq('id', rec.id).maybeSingle();
+      if (!fresh?.storage_bucket || !fresh.storage_path) return { url: null, error: 'The recording could not be loaded. Please try again.' };
+      rec = { ...rec, storage_bucket: fresh.storage_bucket, storage_path: fresh.storage_path };
+    }
     if (rec.storage_bucket && rec.storage_path) {
       const { data, error } = await db.storage.from(rec.storage_bucket).createSignedUrl(rec.storage_path, 60 * 60);
       if (error || !data) return { url: null, error: 'Recording file could not be loaded from storage' };

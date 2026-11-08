@@ -33,3 +33,14 @@ test('detectEmotion', () => {
   assert.equal(detectEmotion({ connected: true })?.label, 'Neutral');
   assert.equal(detectEmotion({ connected: false, temperature: 'HOT' }), null);
 });
+
+import { interestOf } from '../../src/lib/leads.ts';
+test('interestOf gives one simple word per call', () => {
+  assert.equal(interestOf({ answered: false, outcome: 'interested' }), 'no_answer');
+  assert.equal(interestOf({ answered: true, outcome: 'callback_requested', emotion: 'Annoyed' }), 'callback');
+  assert.equal(interestOf({ answered: true, outcome: 'converted' }), 'interested');
+  assert.equal(interestOf({ answered: true, outcome: 'not_interested', emotion: 'Excited' }), 'not_interested');
+  assert.equal(interestOf({ answered: true, outcome: 'other', emotion: 'Confused' }), 'confused');
+  assert.equal(interestOf({ answered: true, outcome: 'other', emotion: 'Disinterested' }), 'not_interested');
+  assert.equal(interestOf({ answered: true, outcome: null, emotion: 'Neutral' }), 'unclear');
+});

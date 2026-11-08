@@ -1,4 +1,5 @@
 import 'server-only';
+import { INTERESTS } from '@/lib/leads';
 import type { DB } from '@/lib/supabase/types';
 import { CALL_OUTCOMES, CALL_STATUSES, MISSED_STATUSES } from '@/lib/constants';
 import { addDays, isValidDateString, istStartOfDay } from '@/lib/dates';
@@ -19,6 +20,7 @@ export interface CallFilters {
   from?: string;
   to?: string;
   recording?: 'yes' | 'no';
+  interest?: (typeof INTERESTS)[number];
 }
 
 export function parseCallFilters(p: Record<string, string | undefined>, forced: Partial<CallFilters> = {}): CallFilters {
@@ -34,6 +36,7 @@ export function parseCallFilters(p: Record<string, string | undefined>, forced: 
     from: isValidDateString(p.from) ? p.from : undefined,
     to: isValidDateString(p.to) ? p.to : undefined,
     recording: parseEnum(p.recording, ['yes', 'no'] as const),
+    interest: parseEnum(p.interest, INTERESTS),
   };
 }
 
@@ -46,6 +49,7 @@ export function applyCallFilters<Q extends { eq: any; in: any; is: any; not: any
   else if (f.status) q = q.eq('status', f.status);
   if (f.outcome === 'not_set') q = q.is('outcome', null);
   else if (f.outcome) q = q.eq('outcome', f.outcome);
+  if (f.interest) q = q.eq('interest', f.interest);
   if (f.campaign) q = q.eq('campaign_id', f.campaign);
   if (f.contact) q = q.eq('contact_id', f.contact);
   if (f.scope === 'live') q = q.eq('is_simulated', false);

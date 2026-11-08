@@ -1,6 +1,6 @@
 import { Flame, Snowflake, Sun } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { emotionTone, LEAD_STAGE_LABELS, LEAD_STAGE_TONE, type LeadStage } from '@/lib/leads';
+import { emotionTone, INTEREST_LABELS, INTEREST_TONE, LEAD_STAGE_LABELS, LEAD_STAGE_TONE, type Interest, type LeadStage } from '@/lib/leads';
 
 export function LeadStageBadge({ stage }: { stage: string | null }) {
   const s = (stage ?? 'new') as LeadStage;
@@ -30,4 +30,9 @@ export function EmotionBadge({ emotion }: { emotion: string | null }) {
       {emotion}
     </Badge>
   );
+}
+
+export function InterestBadge({ interest }: { interest: string | null }) {
+  const k = (interest ?? 'unclear') as Interest | 'pending';
+  return <Badge tone={INTEREST_TONE[k] ?? 'neutral'}>{INTEREST_LABELS[k] ?? k}</Badge>;
 }
