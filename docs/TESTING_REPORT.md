@@ -95,3 +95,14 @@ The CRM now pulls recordings from **Vobiz**, the SIP trunk behind the Sarvam num
 - Sync: `GET /api/v1/Account/{auth_id}/Recording/`. Each recording is matched to an answered real call by the customer's number and time (closest, within 10 minutes). The audio is downloaded into the private `call-recordings` bucket and played with signed links. A recording is attached at most once.
 - When it runs: on page visits (throttled, after the response), on the call page's "Check for recording" button, on "Sync recordings now", and on the cron endpoint.
 - `npm run test:vobiz` (18/18) runs against a fake Vobiz server and covers wrong keys, encryption, matching, private storage, playback, idempotency, cron, disconnect and no token leaks.
+
+## Update: Sarvam recordings (Analytics API), interest filters, funnel
+
+- **Recordings:** Sarvam keeps every call's audio, served at `GET apps.sarvam.ai/api/analytics/v1/{org}/{workspace}/{app}/recordings/{interaction_id}` with an `X-API-Key`. The key is saved once in Integrations → Sarvam → Call recordings, stored AES-GCM encrypted and backend only. org and workspace come from the Sarvam sign-in token.
+  - Every answered Sarvam call gets a recording reference: on key save (backfill), on each webhook, and in the background sweep.
+  - On first playback the WAV is downloaded once, mixed from stereo to mono (half the size) and stored in the private bucket. Later plays use signed links. A 404 from Sarvam removes the reference and shows a clear message.
+  - Verified live 8 Nov 2026: key saved, 52 calls marked, CL-000093 played (4 s, 94 KB).
+  - `npm run test:recordings` (17/17) runs against a fake Sarvam, with the sign-in token deliberately expired.
+- **Interest:** `public.call_interest()` gives each call one word: Interested, Callback, Confused, Not interested, Hung up early (answered, ≤12 s, no signal), No answer or Needs review. It is used by `call_log_view`, the new `campaign_results_view`, the Call Logs filter and column, and the campaign chips.
+- **Campaign results:** interest chips with counts, Funnel (lead stage), Why (AI summary or reason), Play, Call again (one call with the campaign's number and agent) and status. The Report CSV adds interest, funnel_stage, emotion, why and recording.
+- e2e 90/90, webhooks 29/29, vobiz 18/18, DB tests pass, unit 17/17.

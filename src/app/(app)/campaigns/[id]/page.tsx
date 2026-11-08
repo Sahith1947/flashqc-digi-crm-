@@ -140,7 +140,7 @@ export default async function CampaignDetailPage(props: PageProps<'/campaigns/[i
             description={`${ccRes.count ?? 0} contact${ccRes.count === 1 ? '' : 's'}${interest ? ` · ${INTEREST_LABELS[interest]}` : ''}${ccStatus ? ` · ${CAMPAIGN_CONTACT_STATUS_LABELS[ccStatus]}` : ''}. Interest and funnel stage update automatically after every call.`}
           />
           <div className="flex flex-wrap gap-2 border-b border-line px-4 pt-4 pb-3" data-testid="interest-chips">
-            {[null, 'interested', 'callback', 'confused', 'not_interested', 'no_answer', 'unclear', 'pending'].map((v) => {
+            {[null, 'interested', 'callback', 'confused', 'not_interested', 'hung_up', 'no_answer', 'unclear', 'pending'].map((v) => {
               const n = v ? (interestCounts.get(v) ?? 0) : (interestRes.data?.length ?? 0);
               if (v && !n && interest !== v) return null;
               const active = (interest ?? null) === v;

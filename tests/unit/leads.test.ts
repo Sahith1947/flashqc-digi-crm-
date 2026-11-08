@@ -42,5 +42,6 @@ test('interestOf gives one simple word per call', () => {
   assert.equal(interestOf({ answered: true, outcome: 'not_interested', emotion: 'Excited' }), 'not_interested');
   assert.equal(interestOf({ answered: true, outcome: 'other', emotion: 'Confused' }), 'confused');
   assert.equal(interestOf({ answered: true, outcome: 'other', emotion: 'Disinterested' }), 'not_interested');
-  assert.equal(interestOf({ answered: true, outcome: null, emotion: 'Neutral' }), 'unclear');
+  assert.equal(interestOf({ answered: true, outcome: null, emotion: 'Neutral', durationSeconds: 60 }), 'unclear');
+  assert.equal(interestOf({ answered: true, outcome: null, emotion: null, durationSeconds: 7 }), 'hung_up');
 });

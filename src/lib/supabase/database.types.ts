@@ -648,7 +648,7 @@ isOneToOne: false
           }
           Functions: {
             "call_interest":
-{ Args: { "p_answered": boolean,"p_emotion": string,"p_outcome": string }; Returns: string
+{ Args: { "p_answered": boolean,"p_duration": number,"p_emotion": string,"p_outcome": string }; Returns: string
                            },
 "call_trends":
 { Args: { "p_from": string,"p_granularity"?: string,"p_scope"?: string,"p_to": string }; Returns: {
