@@ -106,3 +106,17 @@ The CRM now pulls recordings from **Vobiz**, the SIP trunk behind the Sarvam num
 - **Interest:** `public.call_interest()` gives each call one word: Interested, Callback, Confused, Not interested, Hung up early (answered, ≤12 s, no signal), No answer or Needs review. It is used by `call_log_view`, the new `campaign_results_view`, the Call Logs filter and column, and the campaign chips.
 - **Campaign results:** interest chips with counts, Funnel (lead stage), Why (AI summary or reason), Play, Call again (one call with the campaign's number and agent) and status. The Report CSV adds interest, funnel_stage, emotion, why and recording.
 - e2e 90/90, webhooks 29/29, vobiz 18/18, DB tests pass, unit 17/17.
+
+## Update: speed and automatic agent versions
+
+**Speed.** Root cause: Vercel functions ran in Washington DC (iad1) while Supabase is in Seoul (ap-northeast-2). Every database query took ~630 ms, and a page made 4–8 of them.
+- `vercel.json` now pins `"regions": ["icn1"]` (Seoul). Measured with `/api/diagnostics/latency` (signed-in only): database round trip 630 ms → 35 ms.
+- Session check uses `auth.getClaims()`: the token is verified locally with Supabase's asymmetric keys, so pages no longer make an extra trip to the auth server (~110 ms → 4 ms).
+- Independent lookups run in parallel on Integrations, the dashboard, campaign detail, inbound, and live-call readiness.
+- Live, click to content: before 1.6–6.9 s; after 0.5–1.7 s (measured from the US, so similar or better from India). Every click shows the loading skeleton immediately.
+
+**Agent versions.** `SarvamService.autoSync()` re-reads the agents when the last sync is over 5 minutes old. It runs in the background after page views, before every live call and campaign start (2-minute freshness), on the cron job and on the "Sync from Sarvam" button.
+- When a newer version is published, live calls use it on the next call (the direct campaign is keyed by version), new campaigns start on it, and `SarvamCalling.followLatestVersion()` moves the inbound deployment (pause → `configure_deployment app_version` → resume).
+- Drafts are never used.
+- Live 8 Nov 2026: the CRM went from v4 to v9; the inbound deployment is on v9 and active.
+- `npm run test:versions` (11/11) runs against a fake Sarvam MCP.
