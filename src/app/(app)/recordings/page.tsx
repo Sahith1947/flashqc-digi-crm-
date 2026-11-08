@@ -18,6 +18,8 @@ import { ArtifactsViewer } from '@/components/recordings/artifacts-viewer';
 import { InlineRecordingPlayer } from '@/components/recordings/inline-player';
 
 export const metadata: Metadata = { title: 'Recordings' };
+// First playback of a Sarvam recording downloads it (a few seconds); allow time for that.
+export const maxDuration = 60;
 const PAGE = 20;
 
 export default async function RecordingsPage(props: PageProps<'/recordings'>) {

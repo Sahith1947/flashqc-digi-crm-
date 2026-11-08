@@ -15,6 +15,8 @@ import { BulkCallActions } from '@/components/calls/bulk-call-actions';
 import { hasMinRole } from '@/lib/constants';
 
 export const metadata: Metadata = { title: 'Call Logs' };
+// First playback of a Sarvam recording downloads it (a few seconds); allow time for that.
+export const maxDuration = 60;
 
 export default async function CallLogsPage(props: PageProps<'/calls'>) {
   const { db, profile } = await requireMember();

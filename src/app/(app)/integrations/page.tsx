@@ -22,6 +22,8 @@ import { VobizConnectForm } from '@/components/config/vobiz-connect';
 import { TelephonyService } from '@/server/services/telephony-service';
 
 export const metadata: Metadata = { title: 'Integrations' };
+// First playback of a Sarvam recording downloads it (a few seconds); allow time for that.
+export const maxDuration = 60;
 
 const STATUS_TONE = {
   not_configured: 'neutral',

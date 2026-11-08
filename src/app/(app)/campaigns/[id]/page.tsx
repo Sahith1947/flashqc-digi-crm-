@@ -30,6 +30,8 @@ import { RecordingPlayButton } from '@/components/calls/recording-play-button';
 import type { CampaignResultRow } from '@/lib/supabase/types';
 
 export const metadata: Metadata = { title: 'Campaign' };
+// First playback of a Sarvam recording downloads it (a few seconds); allow time for that.
+export const maxDuration = 60;
 const PAGE = 25;
 const CC_STATUSES = ['pending', 'in_progress', 'completed', 'failed', 'skipped'] as const;
 

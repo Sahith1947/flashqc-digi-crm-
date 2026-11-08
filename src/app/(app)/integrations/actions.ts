@@ -211,7 +211,7 @@ export async function downloadAllRecordings(): Promise<ActionResult> {
     await assertRole('manager');
     const admin = backend();
     await SarvamRecordings.backfill(admin, 3650);
-    const r = await SarvamRecordings.materializePending(admin, { budgetMs: 40_000 });
+    const r = await SarvamRecordings.materializePending(admin, { budgetMs: 25_000 });
     revalidatePath('/recordings');
     revalidatePath('/integrations');
     if (!r.saved && !r.remaining) return { ok: true, message: r.failed ? `${r.failed} call(s) had no recording at Sarvam. Everything else is ready.` : 'All recordings are already saved and ready to play.' };

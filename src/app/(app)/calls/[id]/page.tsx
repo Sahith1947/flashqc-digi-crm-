@@ -23,6 +23,8 @@ import { scheduleRecordingCheck } from '@/server/recording-sync';
 import { CheckRecordingButton } from '@/components/calls/check-recording-button';
 
 export const metadata: Metadata = { title: 'Call details' };
+// First playback of a Sarvam recording downloads it (a few seconds); allow time for that.
+export const maxDuration = 60;
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
