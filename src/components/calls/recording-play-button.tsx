@@ -26,7 +26,7 @@ export function RecordingPlayButton({
     return (
       <span
         className="text-xs whitespace-nowrap text-ink-3"
-        title={simulated ? 'Simulated test call: no real audio' : 'The calling provider has not sent a recording for this call yet. The CRM checks again automatically.'}
+        title={simulated ? 'Simulated test call: no real audio' : 'No recording yet. Connect Vobiz on the Integrations page to get call recordings; the CRM then adds them automatically.'}
       >
         {simulated ? 'Test call' : 'Not received'}
       </span>

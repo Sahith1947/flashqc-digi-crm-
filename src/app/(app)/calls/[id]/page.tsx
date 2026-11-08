@@ -109,7 +109,7 @@ export default async function CallDetailPage(props: PageProps<'/calls/[id]'>) {
             <CardBody className="space-y-4">
               {recordings.length === 0 && (
                 <div className="space-y-2">
-                  <p className="text-sm text-ink-3">{sarvamAnswered ? 'Sarvam has not provided a recording for this call yet. The CRM checks again automatically.' : 'No recording for this call.'}</p>
+                  <p className="text-sm text-ink-3">{sarvamAnswered ? 'No recording yet. The CRM checks Sarvam and Vobiz automatically (connect Vobiz on Integrations to get recordings).' : 'No recording for this call.'}</p>
                   {sarvamAnswered && canAgent && <CheckRecordingButton callId={id} />}
                 </div>
               )}

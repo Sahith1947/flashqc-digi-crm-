@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { serverEnv } from '@/server/env';
 import { CampaignService } from '@/server/services/campaign-service';
+import { VobizService } from '@/server/services/vobiz-service';
 
 // Scheduled campaign processing (e.g. Vercel Cron / Supabase pg_cron hitting this URL every minute).
 // Auth: "Authorization: Bearer <CRON_SECRET>". Processes a bounded batch per running campaign.
@@ -27,7 +28,13 @@ export async function POST(req: NextRequest) {
       results.push({ id: c.id, error: e instanceof Error ? e.message : 'failed' });
     }
   }
-  return NextResponse.json({ processedCampaigns: results.length, results });
+  let recordings: number | null | string = null;
+  try {
+    recordings = await VobizService.sync(admin);
+  } catch (e) {
+    recordings = e instanceof Error ? e.message : 'failed';
+  }
+  return NextResponse.json({ processedCampaigns: results.length, results, recordings });
 }
 
 // Vercel Cron sends GET with "Authorization: Bearer $CRON_SECRET".

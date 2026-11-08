@@ -15,7 +15,8 @@
     "db:start": "supabase start",
     "db:reset": "supabase db reset",
     "db:types": "supabase gen types typescript --local > src/lib/supabase/database.types.ts",
-    "test:webhooks": "node tests/integration/sarvam-webhooks.cjs"
+    "test:webhooks": "node tests/integration/sarvam-webhooks.cjs",
+    "test:vobiz": "node tests/integration/vobiz-recordings.cjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

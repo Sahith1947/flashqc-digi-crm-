@@ -14,7 +14,9 @@ import { CheckButton, IntegrationNotesForm } from '@/components/config/integrati
 import { ActionButton, SarvamConnect } from '@/components/config/sarvam-connect';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { SarvamAuth } from '@/server/providers/sarvam/auth';
-import { enableSarvamCallSync, syncSarvamAgents, syncSarvamNumbers } from './actions';
+import { disconnectVobiz, enableSarvamCallSync, syncSarvamAgents, syncSarvamNumbers, syncVobizRecordings } from './actions';
+import { VobizService } from '@/server/services/vobiz-service';
+import { VobizConnectForm } from '@/components/config/vobiz-connect';
 import { TelephonyService } from '@/server/services/telephony-service';
 
 export const metadata: Metadata = { title: 'Integrations' };
@@ -55,6 +57,7 @@ export default async function IntegrationsPage() {
   const { data: appSettings } = await db.from('app_settings').select('sarvam_inbound_webhook_at').maybeSingle();
   const inboundSync = Boolean(appSettings?.sarvam_inbound_webhook_at);
   const flags = { live: live.available, inbound: inboundSync, recordings: live.available || inboundSync };
+  const vobiz = admin && env.INTEGRATION_ENCRYPTION_KEY ? await VobizService.status(admin) : null;
   const h = await headers();
   const origin = `${h.get('x-forwarded-proto') ?? 'http'}://${h.get('host') ?? 'localhost:3000'}`;
 
@@ -144,6 +147,59 @@ export default async function IntegrationsPage() {
             </CardBody>
           </Card>
         ))}
+        <Card data-testid="vobiz-card">
+          <CardHeader
+            title="Call Recordings (Vobiz)"
+            description={vobiz?.lastSyncAt ? `Last synced ${formatDateTime(vobiz.lastSyncAt)}` : 'Your phone line provider keeps the call audio'}
+            action={<Badge tone={vobiz?.connected ? (vobiz.lastError ? 'critical' : 'good') : 'neutral'}>{vobiz?.connected ? (vobiz.lastError ? 'Error' : 'Connected') : 'Not connected'}</Badge>}
+          />
+          <CardBody className="space-y-4">
+            <p className="text-sm text-ink-2">
+              Sarvam does not keep call audio for your account. Your Sarvam phone number runs on <strong>Vobiz</strong>, which can record every call. Connect it once and recordings
+              appear in Call Logs with a <strong>Play</strong> button automatically.
+            </p>
+            {!vobiz ? (
+              <Notice tone="warning">Set INTEGRATION_ENCRYPTION_KEY and SUPABASE_SECRET_KEY on the server to connect Vobiz.</Notice>
+            ) : vobiz.connected ? (
+              <div className="space-y-3">
+                <ul className="space-y-1.5 text-sm">
+                  <li className="flex justify-between gap-2">
+                    <span className="text-ink-2">Account</span>
+                    <span className="font-mono text-xs">{vobiz.authIdMasked}</span>
+                  </li>
+                  <li className="flex justify-between gap-2">
+                    <span className="text-ink-2">Recordings added to Call Logs</span>
+                    <span className="tabular font-medium" data-testid="vobiz-attached">{vobiz.attached}</span>
+                  </li>
+                  <li className="flex justify-between gap-2">
+                    <span className="text-ink-2">Recording on your phone line</span>
+                    <span className="text-xs">{vobiz.trunkRecording === 'on' ? 'On' : vobiz.trunkRecording === 'off' ? 'Off' : 'Could not read'}</span>
+                  </li>
+                </ul>
+                {vobiz.trunkRecording === 'off' && (
+                  <Notice tone="warning">Recording is switched off for your SIP trunk in Vobiz. Turn on &quot;Recording&quot; for the trunk in the Vobiz console, then new calls will be recorded.</Notice>
+                )}
+                {vobiz.lastError && <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-800">{vobiz.lastError}</p>}
+                <div className="flex flex-wrap gap-2">
+                  {canManage && <ActionButton action={syncVobizRecordings} label="Sync recordings now" testId="vobiz-sync" variant="primary" />}
+                  {isAdmin && <ActionButton action={disconnectVobiz} label="Disconnect" testId="vobiz-disconnect" />}
+                </div>
+              </div>
+            ) : isAdmin ? (
+              <div className="space-y-3">
+                <ol className="list-decimal space-y-1 pl-5 text-sm text-ink-2">
+                  <li>Sign in to the Vobiz console.</li>
+                  <li>Copy your <strong>Auth ID</strong> and <strong>Auth Token</strong> (API keys / account page).</li>
+                  <li>Make sure <strong>Recording</strong> is on for your SIP trunk.</li>
+                  <li>Paste the keys below.</li>
+                </ol>
+                <VobizConnectForm />
+              </div>
+            ) : (
+              <p className="text-sm text-ink-3">An admin can connect Vobiz to turn on call recordings.</p>
+            )}
+          </CardBody>
+        </Card>
       </div>
     </>
   );

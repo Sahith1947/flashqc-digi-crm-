@@ -181,7 +181,7 @@ export async function deleteCalls(callIds: string[]): Promise<ActionResult> {
   });
 }
 
-export async function checkSarvamRecording(callId: string): Promise<ActionResult> {
+export async function checkCallRecording(callId: string): Promise<ActionResult> {
   return runAction(async () => {
     await assertRole('agent');
     const { createAdminClient } = await import('@/lib/supabase/admin');
@@ -189,15 +189,20 @@ export async function checkSarvamRecording(callId: string): Promise<ActionResult
     const admin = createAdminClient();
     if (!admin) return { ok: false, error: 'SUPABASE_SECRET_KEY is not set on the server.' };
     const id = uuid.parse(callId);
-    const res = await SarvamService.fetchRecording(admin, id);
-    refreshCall(id);
-    if (res === 'attached') return { ok: true, message: 'Recording found in Sarvam and attached.' };
+    const { VobizService } = await import('@/server/services/vobiz-service');
+    const res = await SarvamService.fetchRecording(admin, id).catch(() => 'not_available' as const);
+    if (res === 'attached') {
+      refreshCall(id);
+      return { ok: true, message: 'Recording found and attached.' };
+    }
     if (res === 'already') return { ok: true, message: 'This call already has a recording.' };
-    if (res === 'not_applicable') return { ok: false, error: 'Only answered Sarvam calls have recordings.' };
-    return {
-      ok: false,
-      error: 'Sarvam has no recording for this call. Call recording appears to be switched off for your Sarvam workspace or phone number — ask Sarvam support to enable it; new calls will then show recordings automatically.',
-    };
+    const fromVobiz = await VobizService.sync(admin, { callId: id, days: 60 });
+    refreshCall(id);
+    if (fromVobiz) return { ok: true, message: 'Recording found in Vobiz and attached.' };
+    if (fromVobiz === null) {
+      return { ok: false, error: 'Sarvam does not keep recordings for your account. Connect Vobiz (your phone line) on the Integrations page to get call recordings.' };
+    }
+    return { ok: false, error: 'Vobiz has no recording for this call yet. Make sure call recording is switched on for your phone line in the Vobiz console.' };
   });
 }
 

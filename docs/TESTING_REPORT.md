@@ -86,3 +86,12 @@ npm run test:e2e                      # requires a freshly reset DB
 - Call Logs has tick boxes and **Delete selected** for admins (hidden for other roles). Covered by e2e step "Admin: bulk delete selected calls…" (86/86 e2e steps pass).
 - Sarvam attempts from a replaced campaign ("Campaign Cancelled") no longer fail a re-queued live call; the real attempt updates the same call. Covered by `npm run test:webhooks` (29/29).
 - Recordings: Sarvam's analytics report returns `audio_url: null` for every interaction in this workspace (checked 8 Nov 2026), and its MCP has no recording setting. Recordings need Sarvam support to enable them, or Vobiz trunk recording with Vobiz API keys.
+
+## Update: call recordings through Vobiz
+
+Sarvam returns no audio for this workspace. Checked 8 Nov 2026 in every place it could appear: the webhook `recording_url`, the analytics `audio_url`, the interaction trace (only audio hashes) and the transcript report (only timings). Its agent config also has no recording switch.
+The CRM now pulls recordings from **Vobiz**, the SIP trunk behind the Sarvam number:
+- Integrations → "Call Recordings (Vobiz)": an admin pastes the Vobiz Auth ID and Auth Token once. The keys are verified against Vobiz, then stored AES-GCM encrypted in `integration_credentials` (service role only) and never sent to the browser.
+- Sync: `GET /api/v1/Account/{auth_id}/Recording/`. Each recording is matched to an answered real call by the customer's number and time (closest, within 10 minutes). The audio is downloaded into the private `call-recordings` bucket and played with signed links. A recording is attached at most once.
+- When it runs: on page visits (throttled, after the response), on the call page's "Check for recording" button, on "Sync recordings now", and on the cron endpoint.
+- `npm run test:vobiz` (18/18) runs against a fake Vobiz server and covers wrong keys, encryption, matching, private storage, playback, idempotency, cron, disconnect and no token leaks.

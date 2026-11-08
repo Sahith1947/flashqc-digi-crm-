@@ -8,6 +8,7 @@ import { IntegrationService } from '@/server/services/integration-service';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { SarvamAuth } from '@/server/providers/sarvam/auth';
 import { SarvamService } from '@/server/services/sarvam-service';
+import { VobizService } from '@/server/services/vobiz-service';
 import { AppError } from '@/server/providers/types';
 
 const keySchema = z.enum(['sarvam_ai', 'telephony', 'recording_storage']);
@@ -142,3 +143,43 @@ export async function enableSarvamCallSync(): Promise<ActionResult> {
   });
 }
 
+
+// ---------------------------------------------------------------- Vobiz call recordings
+export async function connectVobiz(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  return runAction(async () => {
+    await assertRole('admin');
+    const authId = String(fd.get('vobiz_auth_id') ?? '');
+    const authToken = String(fd.get('vobiz_auth_token') ?? '');
+    if (!authId.trim() || !authToken.trim()) return { ok: false, error: 'Enter both the Auth ID and the Auth Token.' };
+    const admin = backend();
+    await VobizService.connect(admin, authId, authToken);
+    let extra = '';
+    try {
+      const n = await VobizService.sync(admin, { days: 30 });
+      if (n) extra = ` ${n} recording${n === 1 ? '' : 's'} added to Call Logs.`;
+    } catch (e) {
+      console.error('[vobiz] first sync', e);
+    }
+    revalidatePath('/', 'layout');
+    return { ok: true, message: `Vobiz connected. Recordings now sync automatically.${extra}` };
+  });
+}
+
+export async function syncVobizRecordings(): Promise<ActionResult> {
+  return runAction(async () => {
+    await assertRole('agent');
+    const n = await VobizService.sync(backend(), { days: 30 });
+    revalidatePath('/', 'layout');
+    if (n === null) return { ok: false, error: 'Connect Vobiz first.' };
+    return { ok: true, message: n ? `${n} new recording${n === 1 ? '' : 's'} added to Call Logs.` : 'Checked Vobiz: no new recordings for your calls yet.' };
+  });
+}
+
+export async function disconnectVobiz(): Promise<ActionResult> {
+  return runAction(async () => {
+    await assertRole('admin');
+    await VobizService.disconnect(backend());
+    revalidatePath('/integrations');
+    return { ok: true, message: 'Vobiz disconnected. The saved keys were deleted; recordings already in Call Logs stay.' };
+  });
+}
