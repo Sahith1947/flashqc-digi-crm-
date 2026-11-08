@@ -28,7 +28,9 @@ export async function placeOutboundCall(_prev: ActionResult<{ callId: string }> 
     revalidatePath('/');
     const msg = res.simulated
       ? `Simulated call recorded (${res.status.replace('_', ' ')}). No real call was placed.`
-      : `Live call sent to Sarvam. Your number will ring the contact shortly (within the calling hours); the result, transcript and summary appear here when the call ends.`;
+      : res.status === 'ringing'
+        ? 'Calling now through Sarvam. The result, transcript, recording and emotion appear in Call Logs when the call ends.'
+        : 'Call sent to Sarvam. It starts within about 2 minutes; the result, transcript and recording appear in Call Logs when the call ends.';
     return { ok: true, message: msg, data: { callId: res.callId } };
   });
 }

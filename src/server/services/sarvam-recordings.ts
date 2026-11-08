@@ -210,4 +210,9 @@ export const SarvamRecordings = {
     ]);
     return { ready: a.count ?? 0, waiting: b.count ?? 0 };
   },
+
+  /** API key and workspace for Sarvam's REST APIs (instant calls, analytics), or null when no key is saved. */
+  async apiCreds(admin: DB): Promise<Stored | null> {
+    return (await read(admin))?.s ?? null;
+  },
 };

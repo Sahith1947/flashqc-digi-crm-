@@ -18,7 +18,8 @@
     "test:webhooks": "node tests/integration/sarvam-webhooks.cjs",
     "test:vobiz": "node tests/integration/vobiz-recordings.cjs",
     "test:recordings": "node tests/integration/sarvam-recordings.cjs",
-    "test:versions": "node tests/integration/sarvam-versions.cjs"
+    "test:versions": "node tests/integration/sarvam-versions.cjs",
+    "test:instant": "node tests/integration/sarvam-instant.cjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

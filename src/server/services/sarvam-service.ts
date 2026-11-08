@@ -131,6 +131,11 @@ export const SarvamService = {
       const { SarvamCalling } = await import('@/server/providers/sarvam/calling');
       inbound = await SarvamCalling.followLatestVersion(admin);
     }
+    if (changed.length) {
+      // Prepare the fallback calling list for the new version now, so no customer waits for Sarvam's start delay.
+      const { SarvamCalling } = await import('@/server/providers/sarvam/calling');
+      await SarvamCalling.applyCallingHours(admin).catch((e) => console.error('[sarvam] pre-warm campaign', e));
+    }
     return { synced: true, changed, inbound };
   },
 

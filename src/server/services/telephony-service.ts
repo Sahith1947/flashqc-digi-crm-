@@ -1,4 +1,5 @@
 import 'server-only';
+import { InstantRefused, instantCredsFor, placeInstantCall } from '@/server/providers/sarvam/instant';
 import type { DB } from '@/lib/supabase/types';
 import { isE164 } from '@/lib/phone';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -76,13 +77,52 @@ export const TelephonyService = {
       .single();
     if (error) throw error;
     await CallEventService.record(db, call.id, { type: 'initiated', status: 'queued', source: 'user', payload: { via: 'sarvam' } });
+    const vars: Record<string, string> = {};
+    if (contact?.full_name) vars.user_name = contact.full_name;
+    if (contact?.business_name) vars.business_name = contact.business_name;
+    if (contact?.business_category) vars.business_category = contact.business_category;
+    if (contact?.city) vars.location = contact.city;
+
+    // 1) Instant call (needs the Sarvam API key): dials right away, no campaign start delay.
+    const creds = await instantCredsFor(admin);
+    if (creds) {
+      try {
+        const attemptId = await placeInstantCall({
+          apiKey: creds.apiKey,
+          orgId: creds.orgId,
+          workspaceId: creds.workspaceId,
+          appId: r.agent.appId,
+          appVersion: r.agent.version,
+          connectionId: r.line.connectionId,
+          agentPhone: r.line.phone,
+          userPhone: input.phoneE164,
+          variables: vars,
+          baseUrl: r.baseUrl,
+          callId: call.id,
+        });
+        await admin.from('calls').update({ provider: 'sarvam', provider_call_id: attemptId, status: 'ringing' }).eq('id', call.id);
+        await CallEventService.record(admin, call.id, {
+          type: 'submitted_to_sarvam',
+          status: 'ringing',
+          source: 'system',
+          payload: { via: 'instant', attempt_id: attemptId, agent: r.agent.appId, agent_version: r.agent.version, from: r.line.phone },
+        });
+        return { callId: call.id, simulated: false, status: 'ringing', outcome: null };
+      } catch (err) {
+        if (!(err instanceof InstantRefused)) {
+          // Sarvam may have dialled already: never place a second call.
+          const reason = err instanceof Error ? err.message : 'Sarvam error';
+          await CallEventService.record(admin, call.id, { type: 'instant_call_unconfirmed', status: 'queued', source: 'system', payload: { reason } }).catch(() => {});
+          return { callId: call.id, simulated: false, status: 'queued', outcome: null };
+        }
+        // Definitely not dialled: fall back to the campaign route below.
+        await CallEventService.record(admin, call.id, { type: 'instant_call_refused', status: 'queued', source: 'system', payload: { reason: err.message, detail: err.detail ?? null } }).catch(() => {});
+      }
+    }
+
+    // 2) Fallback: the always-on direct campaign (Sarvam starts new campaigns ~2 minutes later).
     try {
       const campaignId = await SarvamCalling.directCampaign(admin, r);
-      const vars: Record<string, string> = {};
-      if (contact?.full_name) vars.user_name = contact.full_name;
-      if (contact?.business_name) vars.business_name = contact.business_name;
-      if (contact?.business_category) vars.business_category = contact.business_category;
-      if (contact?.city) vars.location = contact.city;
       const cohorts = await SarvamCalling.streamUsers(admin, campaignId, `CRM call ${call.id.slice(0, 8)}`, [
         { user_phone_number: input.phoneE164, user_identifier: `call:${call.id}`, app_variables: vars },
       ]);
@@ -94,8 +134,9 @@ export const TelephonyService = {
       });
       return { callId: call.id, simulated: false, status: 'queued', outcome: null };
     } catch (err) {
-      const reason = err instanceof Error ? err.message : 'Sarvam error';
-      const detail = err instanceof AppError ? (err.detail ?? null) : null;
+      const raw = err instanceof Error ? err.message : 'Sarvam error';
+      const reason = /fetch failed|ECONN|ENOTFOUND|network/i.test(raw) ? 'Could not reach Sarvam. Please try again in a minute.' : raw;
+      const detail = err instanceof AppError ? (err.detail ?? null) : raw;
       await db.from('calls').update({ status: 'failed', failure_reason: reason.slice(0, 500) }).eq('id', call.id);
       // System events are written with the backend client (users may only add 'user' events).
       await CallEventService.record(admin, call.id, { type: 'failed', status: 'failed', source: 'system', payload: { reason, detail } }).catch((e) => console.error('[telephony] event', e));

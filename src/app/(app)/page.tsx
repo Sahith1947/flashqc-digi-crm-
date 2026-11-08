@@ -149,6 +149,31 @@ export default async function OverviewPage(props: PageProps<'/'>) {
         </Card>
       </div>
 
+      <Card className="mt-6" data-testid="follow-up-card">
+        <CardHeader
+          title="Follow up now"
+          description="Clients who want to hear from you. Click a box to see them, play their call and call back."
+          action={<LinkButton href="/leads" variant="ghost" size="sm">Hot Leads <ArrowRight className="size-3.5" /></LinkButton>}
+        />
+        <CardBody>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {(
+              [
+                ['interested', 'Interested', 'border-green-200 bg-green-50 text-green-900'],
+                ['callback', 'Callback', 'border-amber-200 bg-amber-50 text-amber-900'],
+                ['meeting_booked', 'Meeting booked', 'border-sky-200 bg-sky-50 text-sky-900'],
+                ['won', 'Converted', 'border-brand-200 bg-brand-50 text-ink'],
+              ] as const
+            ).map(([k, label, cls]) => (
+              <Link key={k} href={`/leads?stage=${k}`} data-testid={`follow-up-${k}`} className={`rounded-xl border p-4 transition hover:shadow-sm ${cls}`}>
+                <p className="text-sm font-medium">{label}</p>
+                <p className="tabular mt-1 text-3xl font-semibold">{stageCount.get(k) ?? 0}</p>
+              </Link>
+            ))}
+          </div>
+        </CardBody>
+      </Card>
+
       <div className="mt-6 grid gap-6 xl:grid-cols-3">
         <Card className="xl:col-span-2">
           <CardHeader

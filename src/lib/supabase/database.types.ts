@@ -82,6 +82,12 @@ isOneToOne: false
       referencedRelation: "campaign_results_view"
       referencedColumns: ["call_id"]
     },{
+      foreignKeyName: "call_events_call_id_fkey"
+      columns: ["call_id"]
+isOneToOne: false
+      referencedRelation: "hot_leads_view"
+      referencedColumns: ["call_id"]
+    },{
       foreignKeyName: "call_events_created_by_fkey"
       columns: ["created_by"]
 isOneToOne: false
@@ -118,6 +124,12 @@ isOneToOne: false
       columns: ["call_id"]
 isOneToOne: false
       referencedRelation: "campaign_results_view"
+      referencedColumns: ["call_id"]
+    },{
+      foreignKeyName: "call_recordings_call_id_fkey"
+      columns: ["call_id"]
+isOneToOne: false
+      referencedRelation: "hot_leads_view"
       referencedColumns: ["call_id"]
     },{
       foreignKeyName: "call_recordings_uploaded_by_fkey"
@@ -158,6 +170,12 @@ isOneToOne: true
       referencedRelation: "campaign_results_view"
       referencedColumns: ["call_id"]
     },{
+      foreignKeyName: "call_summaries_call_id_fkey"
+      columns: ["call_id"]
+isOneToOne: true
+      referencedRelation: "hot_leads_view"
+      referencedColumns: ["call_id"]
+    },{
       foreignKeyName: "call_summaries_created_by_fkey"
       columns: ["created_by"]
 isOneToOne: false
@@ -194,6 +212,12 @@ isOneToOne: true
       columns: ["call_id"]
 isOneToOne: true
       referencedRelation: "campaign_results_view"
+      referencedColumns: ["call_id"]
+    },{
+      foreignKeyName: "call_transcripts_call_id_fkey"
+      columns: ["call_id"]
+isOneToOne: true
+      referencedRelation: "hot_leads_view"
       referencedColumns: ["call_id"]
     },{
       foreignKeyName: "call_transcripts_created_by_fkey"
@@ -245,6 +269,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "contacts_with_stats"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "calls_contact_id_fkey"
+      columns: ["contact_id"]
+isOneToOne: false
+      referencedRelation: "hot_leads_view"
+      referencedColumns: ["contact_id"]
     },{
       foreignKeyName: "calls_created_by_fkey"
       columns: ["created_by"]
@@ -308,6 +338,12 @@ isOneToOne: false
       referencedRelation: "contacts_with_stats"
       referencedColumns: ["id"]
     },{
+      foreignKeyName: "campaign_contacts_contact_id_fkey"
+      columns: ["contact_id"]
+isOneToOne: false
+      referencedRelation: "hot_leads_view"
+      referencedColumns: ["contact_id"]
+    },{
       foreignKeyName: "campaign_contacts_last_call_id_fkey"
       columns: ["last_call_id"]
 isOneToOne: false
@@ -324,6 +360,12 @@ isOneToOne: false
       columns: ["last_call_id"]
 isOneToOne: false
       referencedRelation: "campaign_results_view"
+      referencedColumns: ["call_id"]
+    },{
+      foreignKeyName: "campaign_contacts_last_call_id_fkey"
+      columns: ["last_call_id"]
+isOneToOne: false
+      referencedRelation: "hot_leads_view"
       referencedColumns: ["call_id"]
     }
                   ]
@@ -527,6 +569,12 @@ isOneToOne: false
       referencedRelation: "contacts_with_stats"
       referencedColumns: ["id"]
     },{
+      foreignKeyName: "calls_contact_id_fkey"
+      columns: ["contact_id"]
+isOneToOne: false
+      referencedRelation: "hot_leads_view"
+      referencedColumns: ["contact_id"]
+    },{
       foreignKeyName: "calls_created_by_fkey"
       columns: ["created_by"]
 isOneToOne: false
@@ -588,6 +636,14 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"hot_leads_view": {
+                  Row: {
+                    "business_name": string | null,"call_id": string | null,"city": string | null,"consent_status": string,"contact_id": string,"dnd_status": string,"full_name": string | null,"has_recording": boolean | null,"last_call_at": string | null,"last_call_direction": string | null,"last_call_duration": number | null,"last_emotion": string | null,"lead_stage": string,"lead_temperature": string | null,"lead_updated_at": string | null,"phone_e164": string,"total_calls": number | null,"why": string | null
+                  }
+                  ComputedFields: never
+                  Relationships: [
+                    
+                  ]
                 },"recording_library_view": {
                   Row: {
                     "business_name": string | null,"call_id": string,"call_number": number,"call_started_at": string,"call_status": string,"campaign_id": string | null,"campaign_name": string | null,"contact_id": string | null,"contact_name": string | null,"created_at": string,"direction": string,"duration_seconds": number | null,"has_summary": boolean | null,"has_transcript": boolean | null,"id": string,"is_simulated": boolean,"mime_type": string | null,"phone_e164": string,"provider_recording_id": string | null,"provider_recording_url": string | null,"size_bytes": number | null,"source": string,"storage_bucket": string | null,"storage_path": string | null
@@ -611,6 +667,12 @@ isOneToOne: false
       columns: ["call_id"]
 isOneToOne: false
       referencedRelation: "campaign_results_view"
+      referencedColumns: ["call_id"]
+    },{
+      foreignKeyName: "call_recordings_call_id_fkey"
+      columns: ["call_id"]
+isOneToOne: false
+      referencedRelation: "hot_leads_view"
       referencedColumns: ["call_id"]
     },{
       foreignKeyName: "calls_campaign_id_fkey"
@@ -642,6 +704,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "contacts_with_stats"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "calls_contact_id_fkey"
+      columns: ["contact_id"]
+isOneToOne: false
+      referencedRelation: "hot_leads_view"
+      referencedColumns: ["contact_id"]
     }
                   ]
                 }

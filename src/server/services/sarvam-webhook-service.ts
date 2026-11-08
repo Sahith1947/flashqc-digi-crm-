@@ -42,6 +42,19 @@ export const outboundSchema = z.object({
   executed_at: z.string().nullish(),
 });
 export const inboundSchema = z.object({ ...common, deployment_id: z.string() });
+// Instant outbound call result (sarvam docs: instant-outbound/webhook-payload).
+export const instantSchema = z.object({
+  attempt_id: z.string(),
+  status: z.string(),
+  channel_info: z.object({ agent_phone_number: z.string().nullish() }).passthrough().nullish(),
+  duration: z.number().nullish(),
+  interaction_id: z.string().nullish(),
+  failure_reason: z.string().nullish(),
+  final_agent_variables: z.record(z.string(), z.unknown()).nullish(),
+  interaction_transcript: z.array(turn).nullish(),
+  recording_url: z.string().nullish(),
+  webhook_config: z.object({ url: z.string().nullish(), metadata: z.record(z.string(), z.unknown()).nullish() }).nullish(),
+});
 type Outbound = z.infer<typeof outboundSchema>;
 type Inbound = z.infer<typeof inboundSchema>;
 
@@ -452,8 +465,41 @@ export const SarvamWebhookService = {
     return { calls: processed, created: Math.max(0, (after ?? 0) - (before ?? 0)) };
   },
 
+  /** Instant call result: reuse the outbound pipeline with the CRM call it belongs to. */
+  async handleInstant(admin: DB, p: z.infer<typeof instantSchema>) {
+    const meta = (p.webhook_config?.metadata ?? {}) as Record<string, unknown>;
+    const metaCallId = typeof meta.call_id === 'string' && /^[0-9a-f-]{36}$/.test(meta.call_id) ? meta.call_id : null;
+    const { data: byAttempt } = await admin.from('calls').select('id, phone_e164').eq('provider', 'sarvam').eq('provider_call_id', p.attempt_id).maybeSingle();
+    const { data: byMeta } = byAttempt || !metaCallId ? { data: null } : await admin.from('calls').select('id, phone_e164').eq('id', metaCallId).maybeSingle();
+    const call = byAttempt ?? byMeta;
+    if (!call) throw new Error(`Instant call result for unknown attempt ${p.attempt_id}`);
+    const end = new Date();
+    const start = new Date(end.getTime() - Math.round((p.duration ?? 0) * 1000));
+    return this.handleOutbound(admin, {
+      attempt_id: p.attempt_id,
+      campaign_id: 'instant',
+      completion_status: p.status === 'connected' ? 'completed' : 'failed',
+      connectivity_status: p.status,
+      failure_reason: p.failure_reason ?? null,
+      user_identifier: `call:${call.id}`,
+      user_phone_number: call.phone_e164,
+      agent_phone_number: p.channel_info?.agent_phone_number ?? null,
+      app_id: typeof meta.app_id === 'string' ? meta.app_id : '',
+      interaction_id: p.interaction_id ?? null,
+      duration: p.duration ?? null,
+      recording_url: p.recording_url ?? null,
+      start_datetime: start.toISOString(),
+      end_datetime: end.toISOString(),
+      final_agent_variables: p.final_agent_variables ?? null,
+      interaction_transcript: p.interaction_transcript ?? null,
+      metadata: meta, // recordEvent drops crm_secret before storing
+    });
+  },
+
   async handle(admin: DB, body: unknown) {
     const obj = (body ?? {}) as Record<string, unknown>;
+    if (typeof obj.attempt_id === 'string' && typeof obj.status === 'string' && obj.campaign_id === undefined && obj.deployment_id === undefined)
+      return this.handleInstant(admin, instantSchema.parse(body));
     if (typeof obj.campaign_id === 'string') return this.handleOutbound(admin, outboundSchema.parse(body));
     if (typeof obj.deployment_id === 'string') return this.handleInbound(admin, inboundSchema.parse(body));
     throw new Error('Unrecognised Sarvam webhook payload');

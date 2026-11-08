@@ -206,7 +206,7 @@ function contactsCsv() {
   });
 
   // ------------------------------------------------------------------ ROUTES
-  const routes = ['/', '/inbound', '/outbound', '/campaigns', '/campaigns/new', '/calls', '/recordings', '/contacts', '/contacts/import', '/phone-numbers', '/voice-agents', '/analytics', '/integrations', '/settings', '/settings?tab=organization', '/settings?tab=team', '/settings?tab=suppression', '/settings?tab=audit'];
+  const routes = ['/', '/inbound', '/outbound', '/campaigns', '/campaigns/new', '/leads', '/calls', '/recordings', '/contacts', '/contacts/import', '/phone-numbers', '/voice-agents', '/analytics', '/integrations', '/settings', '/settings?tab=organization', '/settings?tab=team', '/settings?tab=suppression', '/settings?tab=audit'];
   await step('Every route loads (200, h1, no error boundary) — empty state', async () => {
     for (const r of routes) {
       const res = await goto(admin.page, r);
@@ -218,7 +218,7 @@ function contactsCsv() {
   });
   await step('Sidebar links navigate to each module', async () => {
     await goto(admin.page, '/');
-    const labels = ['Inbound Calls', 'Outbound Calls', 'Bulk Campaigns', 'Call Logs', 'Recordings', 'Contacts', 'Phone Numbers', 'Voice Agents', 'Analytics', 'Integrations', 'Settings', 'Overview'];
+    const labels = ['Inbound Calls', 'Outbound Calls', 'Bulk Campaigns', 'Hot Leads', 'Call Logs', 'Recordings', 'Contacts', 'Phone Numbers', 'Voice Agents', 'Analytics', 'Integrations', 'Settings', 'Overview'];
     for (const l of labels) {
       const href = await admin.page.locator('aside nav').getByRole('link', { name: l, exact: true }).getAttribute('href');
       await admin.page.locator('aside nav').getByRole('link', { name: l, exact: true }).click();
@@ -623,6 +623,39 @@ function contactsCsv() {
     await admin.page.getByTestId('call-again-confirm').click();
     await toast(admin.page, 'success', /Simulated call recorded/);
     assert(Number(sql('select count(*) from calls')) === before + 1, 'call again did not place a call');
+  });
+  await step('Hot Leads: tabs, counts, play, call, move to Converted; dashboard follow-up card', async () => {
+    const ids = sql("select id from contacts where consent_status <> 'revoked' and dnd_status <> 'registered' order by created_at limit 3").split('\n');
+    sql(`update contacts set lead_stage='interested' where id='${ids[0]}'`);
+    sql(`update contacts set lead_stage='callback' where id='${ids[1]}'`);
+    sql(`update contacts set lead_stage='meeting_booked' where id='${ids[2]}'`);
+    const db = (st) => sql(`select count(*) from contacts where lead_stage='${st}'`);
+    await goto(admin.page, '/leads');
+    await admin.page.getByTestId('lead-tabs').waitFor();
+    for (const st of ['interested', 'callback', 'meeting_booked', 'won']) {
+      const chip = (await admin.page.getByTestId(`lead-tab-${st}`).innerText()).replace(/\D/g, '');
+      assert(chip === db(st), `${st} tab ${chip} vs db ${db(st)}`);
+    }
+    await admin.page.getByTestId('lead-tab-callback').click();
+    await admin.page.waitForURL(/stage=callback/);
+    assert((await admin.page.locator('[data-testid=hot-leads-table] tbody tr').count()) === Math.min(25, Number(db('callback'))), 'callback rows');
+    const before = Number(sql('select count(*) from calls'));
+    await admin.page.getByTestId('call-lead').first().click();
+    await admin.page.getByTestId('call-lead-confirm').click();
+    await toast(admin.page, 'success', /Simulated call recorded/);
+    assert(Number(sql('select count(*) from calls')) === before + 1, 'call lead did not place a call');
+    await admin.page.getByTestId('lead-stage-select').first().selectOption('won');
+    await toast(admin.page, 'success', /./);
+    assert(Number(db('won')) >= 1, 'not moved to won');
+    await goto(admin.page, '/leads?stage=won');
+    assert((await admin.page.locator('[data-testid=hot-leads-table] tbody tr').count()) === Number(db('won')), 'Converted tab rows');
+    await goto(admin.page, '/');
+    for (const st of ['interested', 'callback', 'meeting_booked', 'won']) {
+      const v = (await admin.page.getByTestId(`follow-up-${st}`).innerText()).replace(/\D/g, '');
+      assert(v === db(st), `dashboard ${st} ${v} vs ${db(st)}`);
+    }
+    await admin.page.getByTestId('follow-up-callback').click();
+    await admin.page.waitForURL(/\/leads\?stage=callback/);
   });
   await step('Call Logs interest filter matches the database', async () => {
     const n = Number(sql("select count(*) from call_log_view where interest='no_answer'"));

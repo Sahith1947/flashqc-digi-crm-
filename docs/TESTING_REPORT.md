@@ -120,3 +120,18 @@ The CRM now pulls recordings from **Vobiz**, the SIP trunk behind the Sarvam num
 - Drafts are never used.
 - Live 8 Nov 2026: the CRM went from v4 to v9; the inbound deployment is on v9 and active.
 - `npm run test:versions` (11/11) runs against a fake Sarvam MCP.
+
+## Update: instant calls and Hot Leads
+
+**Why calls showed "Queued".** A live call was placed through an always-on Sarvam campaign. Whenever the setup changes (a new published agent version, new calling hours), the CRM must create a new campaign, and Sarvam starts new campaigns at least 120 s later. The first call after v9 therefore waited ~3 minutes.
+
+**Fix.**
+- Single live calls (Outbound, Call again, Hot Leads → Call) use Sarvam's instant-outbound API: `POST apps.sarvam.ai/api/outbounds/v1/orgs/{org}/workspaces/{ws}/outbounds`. The call is "Ringing" in under a second.
+- The result webhook (`webhook_config.metadata` carries the CRM secret and call id) runs the same pipeline as other calls: transcript, outcome, emotion, interest, lead stage and recording.
+- Fallback to the campaign route happens only when Sarvam definitely refused the call. On a timeout, no second call is placed.
+- A new published version pre-creates the fallback campaign straight away. New campaigns start 130 s ahead (Sarvam minimum 120 s).
+- Safety net: instant calls still "Ringing" after 5 minutes are looked up in Sarvam's attempts report and finished. After an hour with no record they are marked failed with a reason.
+- Verified live without dialling: Sarvam accepts the key and workspace on the instant endpoint (422 only for the deliberately missing customer number).
+- `npm run test:instant` 17/17.
+
+**Hot Leads (`/leads`).** Tabs Interested / Callback / Meeting booked / Converted / All, with counts. Each client row has the AI's reason from the last call, last call time, Play, Move to (stage) and Call now. The dashboard has a "Follow up now" card with the four counts, linking to the tabs. e2e 91/91.

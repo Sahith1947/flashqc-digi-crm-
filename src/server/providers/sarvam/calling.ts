@@ -124,7 +124,7 @@ export const SarvamCalling = {
   ): Promise<string> {
     const c = await client(admin);
     // Sarvam requires the start to be at least 120 s in the future.
-    const start = new Date(Date.now() + 180_000);
+    const start = new Date(Date.now() + 130_000); // Sarvam requires a start at least 120 s ahead
     // Sarvam caps a campaign's duration at 90 days.
     const end = new Date(start.getTime() + Math.min(input.days ?? 30, 85) * 86400_000);
     const res = await c.callTool<{ id?: string | null; campaign_id?: string }>('configure_campaign', {

@@ -23,7 +23,9 @@ export async function POST(req: NextRequest, ctx: RouteContext<'/api/webhooks/te
     } catch {
       return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
     }
-    const meta = ((body as { metadata?: Record<string, unknown> })?.metadata ?? {}) as Record<string, unknown>;
+    const b = (body ?? {}) as { metadata?: Record<string, unknown>; webhook_config?: { metadata?: Record<string, unknown> } };
+    // Campaign/inbound payloads echo metadata at the top level; instant calls echo it inside webhook_config.
+    const meta = (b.metadata ?? b.webhook_config?.metadata ?? {}) as Record<string, unknown>;
     const presented = typeof meta.crm_secret === 'string' ? meta.crm_secret : (req.nextUrl.searchParams.get('k') ?? '');
     let expected: string;
     try {

@@ -34,13 +34,19 @@ export async function POST(req: NextRequest) {
   } catch (e) {
     agents = e instanceof Error ? e.message : 'failed';
   }
+  let reconciled: number | string = 0;
+  try {
+    reconciled = await (await import('@/server/providers/sarvam/instant')).reconcileInstantCalls(admin, 25);
+  } catch (e) {
+    reconciled = e instanceof Error ? e.message : 'failed';
+  }
   let recordings: number | null | string = null;
   try {
     recordings = await VobizService.sync(admin);
   } catch (e) {
     recordings = e instanceof Error ? e.message : 'failed';
   }
-  return NextResponse.json({ processedCampaigns: results.length, results, recordings, agents });
+  return NextResponse.json({ processedCampaigns: results.length, results, recordings, agents, reconciled });
 }
 
 // Vercel Cron sends GET with "Authorization: Bearer $CRON_SECRET".
