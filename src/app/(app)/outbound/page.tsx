@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { scheduleBackgroundSync } from '@/server/recording-sync';
 import { requireMember } from '@/server/auth';
 import { CALLS_PAGE_SIZE, campaignOptions, listCalls } from '@/server/queries/calls';
 import { agentOptions, getSettings, lineOptions } from '@/server/queries/config';
@@ -18,6 +19,7 @@ export const metadata: Metadata = { title: 'Outbound Calls' };
 
 export default async function OutboundPage(props: PageProps<'/outbound'>) {
   const { db, profile } = await requireMember();
+  scheduleBackgroundSync();
   const params = flatParams(await props.searchParams);
   const { dial, ...listParams } = params;
   const [list, campaigns, lines, agents, settings] = await Promise.all([

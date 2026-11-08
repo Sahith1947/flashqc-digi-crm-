@@ -53,6 +53,8 @@ export const TelephonyService = {
   async startSarvamCall(db: DB, input: StartOutboundInput & { contactId: string | null }): Promise<StartCallResult> {
     const admin = createAdminClient();
     if (!admin) throw new AppError('SUPABASE_SECRET_KEY is required for live calling', 'backend_not_configured');
+    // Use the agent's newest published version (re-read from Sarvam when the last sync is over 2 minutes old).
+    await (await import('@/server/services/sarvam-service')).SarvamService.autoSync(admin, 2 * 60_000).catch((e) => console.error('[sarvam] version sync', e));
     const r = await SarvamCalling.readiness(admin, { voiceAgentId: input.voiceAgentId, phoneNumberId: input.phoneNumberId });
     if (!r.ok) throw new AppError(`Live calling is not ready: ${r.reason}`, 'live_not_ready');
     const { data: contact } = input.contactId

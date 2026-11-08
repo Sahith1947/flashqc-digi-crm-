@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { scheduleBackgroundSync } from '@/server/recording-sync';
 import Link from 'next/link';
 import { PhoneCall, Radio } from 'lucide-react';
 import { requireMember } from '@/server/auth';
@@ -24,6 +25,7 @@ export const metadata: Metadata = { title: 'Inbound Calls' };
 
 export default async function InboundPage(props: PageProps<'/inbound'>) {
   const { db, profile } = await requireMember();
+  scheduleBackgroundSync();
   const params = flatParams(await props.searchParams);
   const since = isoDaysAgo(14);
   const [list, campaigns, lines, settings, missedRes, liveRes] = await Promise.all([

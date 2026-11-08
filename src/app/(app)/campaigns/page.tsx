@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { scheduleBackgroundSync } from '@/server/recording-sync';
 import Link from 'next/link';
 import { Plus } from 'lucide-react';
 import { requireMember } from '@/server/auth';
@@ -19,6 +20,7 @@ const PAGE = 20;
 
 export default async function CampaignsPage(props: PageProps<'/campaigns'>) {
   const { db, profile } = await requireMember();
+  scheduleBackgroundSync();
   const params = flatParams(await props.searchParams);
   const page = parsePage(params.page);
   const status = parseEnum(params.status, CAMPAIGN_STATUSES);

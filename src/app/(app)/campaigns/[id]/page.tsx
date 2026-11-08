@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { scheduleBackgroundSync } from '@/server/recording-sync';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, Download, Phone, Trash2, X } from 'lucide-react';
@@ -39,6 +40,7 @@ export default async function CampaignDetailPage(props: PageProps<'/campaigns/[i
   const { id } = await props.params;
   if (!isUuid(id)) notFound();
   const { db, profile } = await requireMember();
+  scheduleBackgroundSync();
   const params = flatParams(await props.searchParams);
   const page = parsePage(params.page);
   const ccStatus = parseEnum(params.status, CC_STATUSES);

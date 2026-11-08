@@ -8,12 +8,16 @@ import { VobizService } from '@/server/services/vobiz-service';
 let lastSweep = 0;
 const lastCallCheck = new Map<string, number>();
 
+/** Background upkeep after a page is sent: new published agent versions, then recordings. */
+export const scheduleBackgroundSync = () => scheduleRecordingSweep();
+
 export function scheduleRecordingSweep() {
   if (Date.now() - lastSweep < 5 * 60_000) return;
   lastSweep = Date.now();
   after(async () => {
     const admin = createAdminClient();
     if (!admin) return;
+    await SarvamService.autoSync(admin).catch((e) => console.error('[agent version sync]', e));
     await SarvamService.sweepRecordings(admin, 5).catch((e) => console.error('[recording sweep]', e));
     await VobizService.sync(admin).catch((e) => console.error('[vobiz sweep]', e));
     const { SarvamRecordings } = await import('@/server/services/sarvam-recordings');

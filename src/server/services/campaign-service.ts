@@ -93,6 +93,8 @@ export const CampaignService = {
   async startOnSarvam(db: DB, campaign: Awaited<ReturnType<typeof getCampaign>>) {
     const admin = createAdminClient();
     if (!admin) throw new AppError('SUPABASE_SECRET_KEY is required for live campaigns');
+    // Use the agent's newest published version (re-read from Sarvam when the last sync is over 2 minutes old).
+    await (await import('@/server/services/sarvam-service')).SarvamService.autoSync(admin, 2 * 60_000).catch((e) => console.error('[sarvam] version sync', e));
     const r = await SarvamCalling.readiness(admin, { voiceAgentId: campaign.voice_agent_id, phoneNumberId: campaign.phone_number_id });
     if (!r.ok) throw new AppError(`Live calling is not ready: ${r.reason}`, 'live_not_ready');
 

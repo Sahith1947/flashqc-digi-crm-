@@ -299,6 +299,40 @@ export const SarvamCalling = {
     await c.callTool('agents', { operation: 'commit', id: appId, params: { app_version_description: 'Published from FlashQC Digi CRM' } });
   },
 
+  /**
+   * Moves the inbound deployments on the CRM's numbers to the agent's newest committed (published)
+   * version. Sarvam edits only paused deployments: pause, patch app_version, and always resume.
+   */
+  async followLatestVersion(admin: DB): Promise<{ name: string; from: number | null; to: number }[]> {
+    const c = await client(admin);
+    const [{ data: lines }, { data: agents }] = await Promise.all([
+      admin.from('phone_numbers').select('phone_e164').not('provider_connection_id', 'is', null),
+      admin.from('voice_agents').select('provider_agent_id, provider_committed_version').eq('provider', 'sarvam').not('provider_committed_version', 'is', null),
+    ]);
+    const ours = new Set((lines ?? []).map((l) => l.phone_e164));
+    const latest = new Map((agents ?? []).map((a) => [a.provider_agent_id, a.provider_committed_version as number]));
+    const list = await c.callTool<{ items?: { deployment_id: string; name: string; app_id?: string; app_version?: number; phone_numbers?: string[]; status?: string }[] }>('telephony', { operation: 'list_deployments', params: { limit: 50 } });
+    const moved: { name: string; from: number | null; to: number }[] = [];
+    for (const d of list.items ?? []) {
+      if (!(d.phone_numbers ?? []).some((p) => ours.has(p))) continue;
+      const to = d.app_id ? latest.get(d.app_id) : undefined;
+      if (!to || (d.app_version ?? 0) >= to) continue;
+      const wasActive = (d.status ?? '').toLowerCase() === 'active';
+      try {
+        if (wasActive) await c.callTool('telephony', { operation: 'pause_deployment', id: d.deployment_id });
+        await c.callTool('configure_deployment', { deployment_id: d.deployment_id, app_version: to });
+        moved.push({ name: d.name, from: d.app_version ?? null, to });
+      } finally {
+        if (wasActive) {
+          await c.callTool('telephony', { operation: 'resume_deployment', id: d.deployment_id }).catch(async () => {
+            await c.callTool('telephony', { operation: 'resume_deployment', id: d.deployment_id });
+          });
+        }
+      }
+    }
+    return moved;
+  },
+
   /** Points Sarvam's inbound deployments for the CRM's numbers at the CRM webhook. */
   async enableInboundSync(admin: DB): Promise<{ deployments: string[] }> {
     const baseUrl = serverEnv.publicBaseUrl;

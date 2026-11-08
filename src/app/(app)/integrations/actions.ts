@@ -109,11 +109,19 @@ export async function disconnectSarvam(): Promise<ActionResult> {
 export async function syncSarvamAgents(): Promise<ActionResult> {
   return runAction(async () => {
     await assertRole('manager');
-    const r = await SarvamService.syncAgents(backend());
+    const admin = backend();
+    const r = await SarvamService.syncAgents(admin);
+    let moved = '';
+    const { data: s } = await admin.from('app_settings').select('sarvam_inbound_webhook_at').maybeSingle();
+    if (s?.sarvam_inbound_webhook_at) {
+      const { SarvamCalling } = await import('@/server/providers/sarvam/calling');
+      const m = await SarvamCalling.followLatestVersion(admin);
+      if (m.length) moved = ` Incoming calls now use ${m.map((x) => `v${x.to}`).join(', ')}.`;
+    }
     refreshSarvamPages();
     return {
       ok: true,
-      message: `Synced ${r.total} agent${r.total === 1 ? '' : 's'} from Sarvam (${r.created} new, ${r.updated} updated${r.missing ? `, ${r.missing} no longer in Sarvam` : ''}).`,
+      message: `Synced ${r.total} agent${r.total === 1 ? '' : 's'} from Sarvam (${r.created} new, ${r.updated} updated${r.missing ? `, ${r.missing} no longer in Sarvam` : ''}).${moved}`,
     };
   });
 }

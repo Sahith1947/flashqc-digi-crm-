@@ -110,6 +110,30 @@ export const SarvamService = {
   },
 
   /** Mirrors every Sarvam agent into voice_agents (matched by provider id, then by name). */
+  /**
+   * Keeps the CRM on the agent's newest published version without anyone pressing "Sync":
+   * re-reads the agents when the last sync is older than `maxAgeMs`, and when a newer version was
+   * published, moves the inbound line to it. Live calls pick the new version up by themselves.
+   */
+  async autoSync(admin: DB, maxAgeMs = 5 * 60_000): Promise<{ synced: boolean; changed: { agent: string; from: number | null; to: number }[]; inbound: { name: string; from: number | null; to: number }[] }> {
+    const { data: before } = await admin.from('voice_agents').select('provider_agent_id, name, provider_committed_version, provider_synced_at').eq('provider', 'sarvam').not('provider_agent_id', 'is', null);
+    const last = Math.max(0, ...(before ?? []).map((a) => (a.provider_synced_at ? new Date(a.provider_synced_at).getTime() : 0)));
+    if (Date.now() - last < maxAgeMs) return { synced: false, changed: [], inbound: [] };
+    await this.syncAgents(admin);
+    const { data: after } = await admin.from('voice_agents').select('provider_agent_id, name, provider_committed_version').eq('provider', 'sarvam').not('provider_agent_id', 'is', null);
+    const prev = new Map((before ?? []).map((a) => [a.provider_agent_id, a.provider_committed_version]));
+    const changed = (after ?? [])
+      .filter((a) => a.provider_committed_version && a.provider_committed_version !== prev.get(a.provider_agent_id))
+      .map((a) => ({ agent: a.name, from: prev.get(a.provider_agent_id) ?? null, to: a.provider_committed_version as number }));
+    let inbound: { name: string; from: number | null; to: number }[] = [];
+    const { data: s } = await admin.from('app_settings').select('sarvam_inbound_webhook_at').maybeSingle();
+    if (s?.sarvam_inbound_webhook_at) {
+      const { SarvamCalling } = await import('@/server/providers/sarvam/calling');
+      inbound = await SarvamCalling.followLatestVersion(admin);
+    }
+    return { synced: true, changed, inbound };
+  },
+
   async syncAgents(admin: DB) {
     const c = await client(admin);
     const summaries = await listAll<SarvamAgentSummary>(c, 'agents', 'list');

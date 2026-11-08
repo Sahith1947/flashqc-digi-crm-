@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { scheduleBackgroundSync } from '@/server/recording-sync';
 import { Bot, Trash2 } from 'lucide-react';
 import { requireMember } from '@/server/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -21,6 +22,7 @@ export const metadata: Metadata = { title: 'Voice Agents' };
 
 export default async function VoiceAgentsPage() {
   const { db, profile } = await requireMember();
+  scheduleBackgroundSync();
   const [{ data: agents, error }, { data: lines }, { data: usage }] = await Promise.all([
     db.from('voice_agents').select('*').order('created_at'),
     db.from('phone_numbers').select('voice_agent_id'),
@@ -41,7 +43,7 @@ export default async function VoiceAgentsPage() {
     <>
       <PageHeader
         title="Voice Agents"
-        description="AI voice agents. Sarvam agents are synced from your Sarvam workspace; their prompt and voice are edited in Sarvam."
+        description="Your Sarvam AI agents. Edit and publish versions in Sarvam: the CRM picks up the newest published version automatically (every few minutes, and before every live call)."
         actions={
           canManage ? (
             <>
@@ -83,10 +85,15 @@ export default async function VoiceAgentsPage() {
                 {a.provider_synced_at && (
                   <div className="flex flex-wrap items-center gap-1.5 text-xs" data-testid="sarvam-agent-meta">
                     <Badge tone={a.provider_deployed ? 'good' : 'warning'}>{a.provider_deployed ? 'Deployed in Sarvam' : 'Not deployed'}</Badge>
-                    <Badge tone="neutral" icon={false}>
-                      Sarvam {a.provider_status ?? '—'} · v{a.provider_version ?? '—'}
+                    <Badge tone={a.provider_committed_version ? 'good' : 'warning'} icon={false}>
+                      {a.provider_committed_version ? `Calls use v${a.provider_committed_version} (published)` : 'No published version yet'}
                     </Badge>
-                    <span className="text-ink-3">synced {formatDateTime(a.provider_synced_at)}</span>
+                    {a.provider_version && a.provider_version !== a.provider_committed_version && (
+                      <Badge tone="neutral" icon={false}>
+                        Draft v{a.provider_version} (not used until you publish it)
+                      </Badge>
+                    )}
+                    <span className="text-ink-3">auto-synced {formatDateTime(a.provider_synced_at)}</span>
                   </div>
                 )}
                 {a.provider_agent_id && <p className="font-mono text-[11px] text-ink-3">{a.provider_agent_id}</p>}
@@ -127,7 +134,7 @@ export default async function VoiceAgentsPage() {
         </div>
       ) : (
         <Card>
-          <EmptyState icon={<Bot className="size-5" />} title="No voice agents yet" description="Define each agent's language, greeting and script now. They will be pushed to Sarvam AI in Phase 2." action={canManage ? <VoiceAgentButton /> : undefined} />
+          <EmptyState icon={<Bot className="size-5" />} title="No voice agents yet" description="Connect Sarvam on the Integrations page and your agents appear here automatically." action={canManage ? <VoiceAgentButton /> : undefined} />
         </Card>
       )}
     </>

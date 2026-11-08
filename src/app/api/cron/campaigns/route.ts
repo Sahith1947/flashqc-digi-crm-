@@ -28,13 +28,19 @@ export async function POST(req: NextRequest) {
       results.push({ id: c.id, error: e instanceof Error ? e.message : 'failed' });
     }
   }
+  let agents: unknown = null;
+  try {
+    agents = await (await import('@/server/services/sarvam-service')).SarvamService.autoSync(admin);
+  } catch (e) {
+    agents = e instanceof Error ? e.message : 'failed';
+  }
   let recordings: number | null | string = null;
   try {
     recordings = await VobizService.sync(admin);
   } catch (e) {
     recordings = e instanceof Error ? e.message : 'failed';
   }
-  return NextResponse.json({ processedCampaigns: results.length, results, recordings });
+  return NextResponse.json({ processedCampaigns: results.length, results, recordings, agents });
 }
 
 // Vercel Cron sends GET with "Authorization: Bearer $CRON_SECRET".

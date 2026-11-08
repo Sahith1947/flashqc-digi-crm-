@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { scheduleBackgroundSync } from '@/server/recording-sync';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { requireMember } from '@/server/auth';
@@ -33,6 +34,7 @@ const TREND_SERIES = [
 
 export default async function OverviewPage(props: PageProps<'/'>) {
   const { db, profile } = await requireMember();
+  scheduleBackgroundSync();
   const sp = flatParams(await props.searchParams);
   const range = resolveRange(sp, '30d');
   const scope = parseScope(sp.scope);

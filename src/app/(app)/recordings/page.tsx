@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { scheduleBackgroundSync } from '@/server/recording-sync';
 import Link from 'next/link';
 import { AudioLines } from 'lucide-react';
 import { requireMember } from '@/server/auth';
@@ -24,6 +25,7 @@ const PAGE = 20;
 
 export default async function RecordingsPage(props: PageProps<'/recordings'>) {
   const { db } = await requireMember();
+  scheduleBackgroundSync();
   const params = flatParams(await props.searchParams);
   const page = parsePage(params.page);
   const campaign = isUuid(params.campaign) ? params.campaign : undefined;
