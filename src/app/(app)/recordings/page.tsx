@@ -4,7 +4,6 @@ import { AudioLines } from 'lucide-react';
 import { requireMember } from '@/server/auth';
 import { campaignOptions } from '@/server/queries/calls';
 import { RECORDINGS_BUCKET } from '@/server/services/recording-service';
-import { getRecordingSourceProvider } from '@/server/providers/registry';
 import { flatParams, isUuid, parseEnum, parsePage, searchTerm } from '@/lib/list-params';
 import { addDays, formatDateTime, formatDuration, isValidDateString as isValidDate, istStartOfDay } from '@/lib/dates';
 import { formatPhone, normalizePhone } from '@/lib/phone';
@@ -16,6 +15,7 @@ import { Pagination } from '@/components/ui/pagination';
 import { DirectionBadge, SimulatedBadge } from '@/components/ui/badge';
 import { callRef } from '@/components/calls/calls-table';
 import { ArtifactsViewer } from '@/components/recordings/artifacts-viewer';
+import { InlineRecordingPlayer } from '@/components/recordings/inline-player';
 
 export const metadata: Metadata = { title: 'Recordings' };
 const PAGE = 20;
@@ -44,7 +44,10 @@ export default async function RecordingsPage(props: PageProps<'/recordings'>) {
     q = q.or(parts.join(','));
   }
   const [{ data, count, error }, campaigns] = await Promise.all([
-    q.order('call_started_at', { ascending: false }).order('id').range((page - 1) * PAGE, page * PAGE - 1),
+    q
+      .order('call_started_at', { ascending: false })
+      .order('id')
+      .range((page - 1) * PAGE, page * PAGE - 1),
     campaignOptions(db),
   ]);
   if (error && error.code !== 'PGRST103') throw error;
@@ -57,20 +60,46 @@ export default async function RecordingsPage(props: PageProps<'/recordings'>) {
     const { data: urls } = await db.storage.from(RECORDINGS_BUCKET).createSignedUrls(paths, 3600);
     urls?.forEach((u) => u.path && u.signedUrl && signed.set(u.path, u.signedUrl));
   }
-  const providerPlayback = getRecordingSourceProvider().configured;
 
   return (
     <>
-      <PageHeader title="Recordings" description="Call recordings stored privately. Playback links are signed and expire after one hour." />
+      <PageHeader title="Recordings" description="Every answered call's recording from Sarvam, newest first. Press Play to listen. Times in IST." />
       <Card>
         <div className="border-b border-line p-4">
           <FilterBar
             basePath="/recordings"
-            search={{ value: params.q, placeholder: 'Contact, business, campaign or phone' }}
+            search={{
+              value: params.q,
+              placeholder: 'Contact, business, campaign or phone',
+            }}
             selects={[
-              { name: 'direction', label: 'Direction', anyLabel: 'All directions', value: direction, options: [{ value: 'inbound', label: 'Inbound' }, { value: 'outbound', label: 'Outbound' }] },
-              { name: 'campaign', label: 'Campaign', anyLabel: 'All campaigns', value: campaign, options: campaigns },
-              { name: 'transcript', label: 'Transcript', anyLabel: 'Any transcript', value: transcript, options: [{ value: 'yes', label: 'Has transcript' }, { value: 'no', label: 'No transcript' }] },
+              {
+                name: 'direction',
+                label: 'Direction',
+                anyLabel: 'All directions',
+                value: direction,
+                options: [
+                  { value: 'inbound', label: 'Inbound' },
+                  { value: 'outbound', label: 'Outbound' },
+                ],
+              },
+              {
+                name: 'campaign',
+                label: 'Campaign',
+                anyLabel: 'All campaigns',
+                value: campaign,
+                options: campaigns,
+              },
+              {
+                name: 'transcript',
+                label: 'Transcript',
+                anyLabel: 'Any transcript',
+                value: transcript,
+                options: [
+                  { value: 'yes', label: 'Has transcript' },
+                  { value: 'no', label: 'No transcript' },
+                ],
+              },
             ]}
             extra={
               <div className="flex items-center gap-1">
@@ -115,12 +144,17 @@ export default async function RecordingsPage(props: PageProps<'/recordings'>) {
                           Your browser does not support audio playback.
                         </audio>
                       ) : r.provider_recording_id ? (
-                        <p className="text-xs text-ink-3">{providerPlayback ? 'Open the call to play this provider recording.' : 'Provider playback connects in Phase 2.'}</p>
+                        <InlineRecordingPlayer callId={r.call_id!} />
                       ) : (
                         <p className="text-xs text-red-700">File unavailable</p>
                       )}
                     </div>
-                    <ArtifactsViewer callId={r.call_id!} title={`${callRef(r.call_number)} · ${r.contact_name || formatPhone(r.phone_e164)}`} hasTranscript={Boolean(r.has_transcript)} hasSummary={Boolean(r.has_summary)} />
+                    <ArtifactsViewer
+                      callId={r.call_id!}
+                      title={`${callRef(r.call_number)} · ${r.contact_name || formatPhone(r.phone_e164)}`}
+                      hasTranscript={Boolean(r.has_transcript)}
+                      hasSummary={Boolean(r.has_summary)}
+                    />
                   </li>
                 );
               })}
@@ -131,12 +165,13 @@ export default async function RecordingsPage(props: PageProps<'/recordings'>) {
           <EmptyState
             icon={<AudioLines className="size-5" />}
             title={Object.keys(params).length ? 'No recordings match these filters' : 'No recordings yet'}
-            description="Recordings appear here when uploaded on a call's detail page, or automatically from the telephony provider after Phase 2. Demo recordings are never generated."
+            description="Recordings appear here automatically after each answered Sarvam call (switch them on in Integrations → Sarvam → Call recordings). You can also upload one on a call's page."
           />
         )}
       </Card>
       <Notice tone="info" className="mt-6">
-        Storage: private Supabase bucket <code className="font-mono text-xs">call-recordings</code>. Provider-hosted recordings will be resolved server-side through the RecordingService once the telephony integration is connected.
+        Recordings are kept in private storage. Playback links are signed and expire after one hour. The first play of a new recording takes a few seconds while it is fetched from
+        Sarvam.
       </Notice>
     </>
   );

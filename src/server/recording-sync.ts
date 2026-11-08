@@ -16,6 +16,8 @@ export function scheduleRecordingSweep() {
     if (!admin) return;
     await SarvamService.sweepRecordings(admin, 5).catch((e) => console.error('[recording sweep]', e));
     await VobizService.sync(admin).catch((e) => console.error('[vobiz sweep]', e));
+    const { SarvamRecordings } = await import('@/server/services/sarvam-recordings');
+    await SarvamRecordings.materializePending(admin, { limit: 3, budgetMs: 20_000 }).catch((e) => console.error('[recording save]', e));
   });
 }
 

@@ -113,6 +113,9 @@ export const SarvamRecordings = {
     if (!ref) return false;
     const { count } = await admin.from('call_recordings').select('id', { count: 'exact', head: true }).eq('call_id', callId);
     if (count) return false;
+    // Sarvam already said it has no recording for this call: don't ask again.
+    const { count: none } = await admin.from('call_events').select('id', { count: 'exact', head: true }).eq('call_id', callId).eq('event_type', 'recording_unavailable');
+    if (none) return false;
     const { error } = await admin.from('call_recordings').insert({
       call_id: callId,
       source: 'provider',
@@ -156,6 +159,7 @@ export const SarvamRecordings = {
     }
     if (res.status === 404) {
       await admin.from('call_recordings').delete().eq('id', rec.id);
+      await admin.from('call_events').insert({ call_id: rec.call_id, event_type: 'recording_unavailable', source: 'system', payload: { provider: 'sarvam' } });
       return 'Sarvam has no recording for this call.';
     }
     if (res.status === 401 || res.status === 403) return 'Sarvam rejected the saved API key. Save a new key on the Integrations page.';
@@ -174,5 +178,36 @@ export const SarvamRecordings = {
       .select('id');
     if (!done?.length) await admin.storage.from(RECORDINGS_BUCKET).remove([path]); // another request saved it first
     return null;
+  },
+
+  /** Downloads recordings that are marked but not saved yet, newest first, within a time budget. */
+  async materializePending(admin: DB, opts: { limit?: number; budgetMs?: number } = {}): Promise<{ saved: number; failed: number; remaining: number }> {
+    const started = Date.now();
+    const budget = opts.budgetMs ?? 40_000;
+    const { data } = await admin
+      .from('recording_library_view')
+      .select('id')
+      .like('provider_recording_id', 'sarvam:%')
+      .is('storage_path', null)
+      .order('call_started_at', { ascending: false })
+      .limit(opts.limit ?? 200);
+    let saved = 0;
+    let failed = 0;
+    for (const r of data ?? []) {
+      if (Date.now() - started > budget) break;
+      const err = await this.materialize(admin, r.id!);
+      if (err) failed++;
+      else saved++;
+    }
+    const { count } = await admin.from('call_recordings').select('id', { count: 'exact', head: true }).like('provider_recording_id', 'sarvam:%').is('storage_path', null);
+    return { saved, failed, remaining: count ?? 0 };
+  },
+
+  async counts(admin: DB): Promise<{ ready: number; waiting: number }> {
+    const [a, b] = await Promise.all([
+      admin.from('call_recordings').select('id', { count: 'exact', head: true }).not('storage_path', 'is', null),
+      admin.from('call_recordings').select('id', { count: 'exact', head: true }).like('provider_recording_id', 'sarvam:%').is('storage_path', null),
+    ]);
+    return { ready: a.count ?? 0, waiting: b.count ?? 0 };
   },
 };

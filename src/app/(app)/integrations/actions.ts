@@ -205,3 +205,19 @@ export async function removeSarvamApiKey(): Promise<ActionResult> {
     return { ok: true, message: 'Sarvam API key deleted. Recordings already saved stay playable.' };
   });
 }
+
+export async function downloadAllRecordings(): Promise<ActionResult> {
+  return runAction(async () => {
+    await assertRole('manager');
+    const admin = backend();
+    await SarvamRecordings.backfill(admin, 3650);
+    const r = await SarvamRecordings.materializePending(admin, { budgetMs: 40_000 });
+    revalidatePath('/recordings');
+    revalidatePath('/integrations');
+    if (!r.saved && !r.remaining) return { ok: true, message: r.failed ? `${r.failed} call(s) had no recording at Sarvam. Everything else is ready.` : 'All recordings are already saved and ready to play.' };
+    return {
+      ok: true,
+      message: `${r.saved} recording${r.saved === 1 ? '' : 's'} saved${r.failed ? `, ${r.failed} not available at Sarvam` : ''}.${r.remaining ? ` ${r.remaining} still to go — click again to continue.` : ' All recordings are ready.'}`,
+    };
+  });
+}

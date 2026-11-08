@@ -92,13 +92,36 @@ const server = http.createServer((req, res) => {
   await p.goto(BASE + `/calls/${callA}`); await p.locator('audio').first().waitFor();
   ok(downloads() === 1, 'call page plays the saved copy (no second download)');
   // Call B: Sarvam has none -> clear message, reference removed.
-  await p.goto(BASE + '/calls?q=9100000002'); await p.getByTestId('play-recording').first().click();
-  await p.getByText('Sarvam has no recording for this call.').first().waitFor();
-  ok(sql(`select count(*) from call_recordings where call_id='${callB}'`) === '0', 'missing recording: clear message, reference removed');
+  // (The background save may already have tried it and removed the empty reference.)
+  await p.goto(BASE + '/calls?q=9100000002'); await p.getByTestId('calls-table').waitFor();
+  if (await p.getByTestId('play-recording').count()) {
+    await p.getByTestId('play-recording').first().click();
+    await p.getByText('Sarvam has no recording for this call.').first().waitFor();
+  }
+  for (let i = 0; i < 20 && sql(`select count(*) from call_recordings where call_id='${callB}'`) !== '0'; i++) await new Promise((r) => setTimeout(r, 500));
+  ok(sql(`select count(*) from call_recordings where call_id='${callB}'`) === '0', 'missing recording: clear message / reference removed');
 
   // A new inbound call arriving by webhook gets its recording automatically.
   const wh = await fetch(BASE + '/api/webhooks/telephony/sarvam', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ deployment_id: 'dep-1', app_id: APP, app_version: 1, interaction_id: '20261108/int-new', user_phone_number: '+919100000009', agent_phone_number: '+917965482329', duration: 40, start_datetime: new Date(Date.now() - 60_000).toISOString(), end_datetime: new Date().toISOString(), interaction_transcript: [{ role: 'user', en_text: 'Yes I am interested' }], final_agent_variables: { consultation_outcome: 'whatsapp_details_requested', lead_temperature: 'WARM' }, metadata: { crm_secret: WEBHOOK_SECRET } }) });
   ok(wh.ok && sql(`select count(*) from call_recordings r join calls c on c.id=r.call_id where c.provider_call_id='20261108/int-new'`) === '1', `new webhook call gets a recording automatically (${wh.status})`);
+  // Recordings section: a recording not saved yet plays inline (fetched from Sarvam on first play).
+  await p.goto(BASE + '/recordings'); await p.getByTestId('recordings-list').waitFor();
+  ok((await p.getByTestId('recordings-list').locator('li').count()) === 2, 'Recordings section lists every recording (2)');
+  await p.getByTestId('inline-play').first().click();
+  const rsrc = await p.getByTestId('recording-player').last().getAttribute('src');
+  const rbuf = Buffer.from(await (await fetch(rsrc)).arrayBuffer());
+  ok(rbuf.slice(0, 4).toString() === 'RIFF', 'Recordings section: Play fetches and plays the Sarvam recording');
+  ok(!(await p.content()).includes('Phase 2'), 'no outdated "Phase 2" text on Recordings');
+  // Download all: a newly marked call is saved in one click.
+  const callD = mk('+919100000004', '20261108/int-a-second', true);
+  await p.goto(BASE + '/integrations'); await p.getByTestId('download-all-recordings').click();
+  const dl = p.getByText(/recordings? saved|already saved/).first(); await dl.waitFor(); console.log('    download-all said:', await dl.innerText());
+  ok(sql(`select (storage_path is not null)::text from call_recordings where call_id='${callD}'`) === 'true', 'Download all saves every waiting recording');
+  await p.goto(BASE + '/integrations');
+  ok(/3 saved, 0 fetched/.test(await p.getByTestId('sarvam-recordings-summary').innerText()), 'card shows all recordings saved');
+  await p.getByTestId('download-all-recordings').click();
+  await p.getByText(/already saved and ready to play/).first().waitFor();
+  ok(true, 'Download all again: everything already ready');
   // Remove key: deleted, saved recordings stay.
   await p.goto(BASE + '/integrations'); await p.locator('[data-testid=sarvam-recordings] summary').click();
   await p.getByTestId('sarvam-key-remove').click(); await p.getByText(/Sarvam API key deleted/).first().waitFor();
