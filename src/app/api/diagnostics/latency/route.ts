@@ -16,6 +16,14 @@ export async function GET() {
   }
   return NextResponse.json({
     region: process.env.VERCEL_REGION ?? 'local',
+    // Host name only (no credentials): it names the database's region, e.g. aws-0-ap-south-1.pooler.supabase.com.
+    database_host: (() => {
+      try {
+        return new URL(process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL || '').hostname;
+      } catch {
+        return null;
+      }
+    })(),
     verify_login_ms: Math.round(tClaims - t0),
     database_round_trip_ms: q,
   });
