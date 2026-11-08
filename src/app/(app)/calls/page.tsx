@@ -41,7 +41,7 @@ export default async function CallLogsPage(props: PageProps<'/calls'>) {
         {rows.length ? (
           <>
             {canAdmin && <BulkCallActions />}
-            <CallsTable rows={rows} sort={{ params, basePath: '/calls' }} selectable={canAdmin} />
+            <CallsTable rows={rows} sort={{ params, basePath: '/calls' }} selectable={canAdmin} hide={campaigns.length ? [] : ['campaign']} />
             <Pagination page={page} pageSize={CALLS_PAGE_SIZE} total={total} params={params} basePath="/calls" />
           </>
         ) : (
