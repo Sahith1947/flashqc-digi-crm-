@@ -26,13 +26,12 @@ const CAPABILITIES: Record<string, { label: string; ready: keyof ReturnType<type
   sarvam_ai: [
     { label: 'Voice agent sync (Sarvam → CRM)', ready: 'sarvam' },
     { label: 'Telephony number sync', ready: 'sarvam' },
-    { label: 'Speech-to-text transcripts', ready: 'transcription' },
-    { label: 'AI call summaries', ready: 'summaries' },
+    { label: 'Call transcripts & AI summaries (sent by Sarvam after each call)', ready: 'recordings' },
   ],
   telephony: [
     { label: 'Live outbound calls & campaigns', ready: 'live' },
     { label: 'Inbound call sync', ready: 'inbound' },
-    { label: 'Call recordings, transcripts & AI summaries', ready: 'recordings' },
+    { label: 'Call transcripts, AI summaries & caller emotion', ready: 'recordings' },
   ],
   recording_storage: [{ label: 'Private recording uploads & signed playback', ready: 'storage' }],
 };

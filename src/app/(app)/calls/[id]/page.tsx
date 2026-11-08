@@ -1,11 +1,10 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, Sparkles, Trash2 } from 'lucide-react';
+import { ArrowLeft, Trash2 } from 'lucide-react';
 import { requireMember } from '@/server/auth';
 import { CallEventService } from '@/server/services/call-event-service';
 import { RecordingService } from '@/server/services/recording-service';
-import { TranscriptService } from '@/server/services/transcript-service';
 import { isUuid } from '@/lib/list-params';
 import { formatDateTime, formatDuration } from '@/lib/dates';
 import { formatPhone } from '@/lib/phone';
@@ -14,7 +13,6 @@ import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { CallStatusBadge, DirectionBadge, SimulatedBadge, Badge } from '@/components/ui/badge';
 import { Notice } from '@/components/ui/states';
-import { Button } from '@/components/ui/button';
 import { ConfirmAction } from '@/components/ui/confirm-action';
 import { callRef } from '@/components/calls/calls-table';
 import { OutcomeForm, RecordingUploader, SaveContactForm } from '@/components/calls/call-detail-forms';
@@ -58,7 +56,6 @@ export default async function CallDetailPage(props: PageProps<'/calls/[id]'>) {
   const sarvamAnswered = !call.is_simulated && call.provider === 'sarvam' && call.is_answered;
   if (sarvamAnswered && recordings.length === 0) scheduleRecordingCheck(id);
   const summary = summaryRes.data;
-  const ai = TranscriptService.isAiAvailable();
   const canAgent = hasMinRole(profile.role, 'agent');
   const canManager = hasMinRole(profile.role, 'manager');
   const canAdmin = hasMinRole(profile.role, 'admin');
@@ -152,12 +149,7 @@ export default async function CallDetailPage(props: PageProps<'/calls/[id]'>) {
           <Card>
             <CardHeader
               title="AI summary"
-              action={
-                <Button variant="secondary" size="sm" icon={<Sparkles className="size-3.5" />} disabled title="Available after the Sarvam AI integration (Phase 2)">
-                  {ai.summaries ? 'Generate' : 'Generate (Phase 2)'}
-                </Button>
-              }
-              description={summary ? `${summary.source === 'ai' ? `AI · ${summary.model ?? ''}` : 'Written manually'} · updated ${formatDateTime(summary.updated_at)}` : 'AI summaries will be generated automatically once Sarvam AI is connected.'}
+              description={summary ? `${summary.source === 'ai' ? `AI · ${summary.model ?? ''}` : 'Written manually'} · updated ${formatDateTime(summary.updated_at)}` : 'The AI summary appears here automatically after an answered Sarvam call.'}
             />
             <CardBody>
               <EditableSection

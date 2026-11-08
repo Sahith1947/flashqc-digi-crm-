@@ -489,9 +489,8 @@ function contactsCsv() {
     await admin.page.getByTestId('summary-view').waitFor();
     assert(sql(`select source from call_summaries where call_id='${anitaCall}'`) === 'manual', 'summary source');
   });
-  await step('AI generate buttons are disabled with Phase 2 label', async () => {
-    const btn = admin.page.getByRole('button', { name: /Generate \(Phase 2\)/ });
-    assert(await btn.isDisabled(), 'AI button enabled');
+  await step('Call page has no dead AI buttons (summaries arrive automatically)', async () => {
+    assert((await admin.page.getByRole('button', { name: /Generate/ }).count()) === 0, 'dead Generate button still shown');
   });
   await step('Do-not-call outcome adds number to suppression list', async () => {
     await goto(admin.page, `/calls/${unknownInbound}`);

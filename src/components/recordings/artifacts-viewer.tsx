@@ -44,7 +44,7 @@ export function ArtifactsViewer({ callId, title, hasTranscript, hasSummary }: { 
               <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold">
                 AI summary {data.summary && <Badge tone="neutral" icon={false}>{data.summary.source === 'ai' ? `AI${data.summary.model ? ` · ${data.summary.model}` : ''}` : 'Manual'}</Badge>}
               </h3>
-              {data.summary ? <p className="text-sm whitespace-pre-wrap">{data.summary.summary}</p> : <p className="text-sm text-ink-3">{hasSummary ? 'Summary unavailable.' : 'No summary yet. AI summaries arrive with the Sarvam AI integration (Phase 2).'}</p>}
+              {data.summary ? <p className="text-sm whitespace-pre-wrap">{data.summary.summary}</p> : <p className="text-sm text-ink-3">{hasSummary ? 'Summary unavailable.' : 'No summary yet. It appears automatically after an answered Sarvam call.'}</p>}
             </section>
             <section>
               <h3 className="mb-2 text-sm font-semibold">Transcript</h3>

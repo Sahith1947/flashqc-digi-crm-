@@ -74,7 +74,7 @@ export const RecordingService = {
     }
     if (rec.provider_recording_id) {
       const provider = getRecordingSourceProvider();
-      if (!provider.configured) return { url: null, error: 'Provider recording playback is not connected yet (Phase 2)' };
+      if (!provider.configured) return { url: null, error: 'This recording cannot be played yet. Check Integrations.' };
       try {
         return { url: await provider.getPlaybackUrl(rec.provider_recording_id), error: null };
       } catch (e) {
